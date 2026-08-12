@@ -1,0 +1,118 @@
+/* Il mio inglese — stile Apple, mobile-first */
+:root{
+  --bg:#f2f2f7;            /* grigio iOS */
+  --card:#ffffff;
+  --accent:#0a84ff;        /* blu iOS */
+  --accent-soft:#eaf3ff;
+  --text:#1c1c1e;
+  --muted:#8a8a8e;
+  --line:#e5e5ea;
+  --green:#34c759;
+  --red:#ff3b30;
+  --radius:16px;
+  --tabh:60px;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+body{
+  margin:0;background:var(--bg);color:var(--text);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom));
+  -webkit-font-smoothing:antialiased;
+}
+
+/* top bar */
+.top{position:sticky;top:0;z-index:20;background:rgba(242,242,247,.92);backdrop-filter:blur(14px);
+  padding:calc(10px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:10px;min-height:52px;}
+.top .title{font-size:22px;font-weight:700;letter-spacing:-.4px;}
+.top .back{border:none;background:none;color:var(--accent);font-size:17px;font-weight:500;padding:0;display:flex;align-items:center;gap:2px;}
+.top .spacer{flex:1;}
+
+/* search */
+.search{padding:6px 16px 10px;}
+.search input{width:100%;padding:11px 14px;font-size:17px;border:none;border-radius:12px;background:#e4e4e9;outline:none;color:var(--text);}
+.search input::placeholder{color:#9a9a9f;}
+
+/* content */
+main{padding:4px 16px 24px;}
+.hgroup{font-size:13px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin:20px 4px 8px;}
+.letter{font-size:15px;font-weight:700;color:var(--accent);margin:16px 6px 6px;}
+
+/* cards */
+.card{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.06);margin-bottom:10px;overflow:hidden;transition:transform .12s ease;}
+.card:active{transform:scale(.985);}
+.card .head{padding:14px 16px;display:flex;align-items:center;gap:12px;cursor:pointer;}
+.num{flex:none;min-width:30px;height:30px;border-radius:8px;background:var(--accent-soft);color:var(--accent);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;}
+.ctitle{flex:1;font-weight:600;font-size:16px;line-height:1.3;}
+.cdesc{color:var(--muted);font-size:13px;margin-top:2px;font-weight:400;}
+.chev{color:#c4c4c9;font-size:20px;transition:transform .2s;}
+.card.open .chev{transform:rotate(90deg);}
+.body{max-height:0;overflow:hidden;transition:max-height .28s ease;}
+.card.open .body{max-height:1600px;}
+.body-in{padding:0 16px 14px 58px;}
+.exp{font-size:15px;line-height:1.5;margin:8px 0;color:#2c2c2e;}
+.exline{font-size:14px;padding:9px 12px;border-radius:10px;margin:6px 0;display:flex;gap:8px;line-height:1.4;}
+.exline b{flex:none;}
+.wrong{background:#ffeceb;color:var(--red);}
+.right{background:#e7f8ec;color:#1f9d43;}
+
+/* rows (vocab / idiomi) */
+.row{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:11px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;}
+.row .main{flex:1;min-width:0;}
+.line{display:flex;flex-wrap:wrap;gap:8px;align-items:baseline;}
+.en{font-weight:600;font-size:17px;}
+.pr{color:var(--accent);font-style:italic;font-size:13px;}
+.it{color:#3a3a3c;font-size:15px;}
+.it:before{content:"— ";color:#c4c4c9;}
+.exq{color:var(--muted);font-style:italic;font-size:13px;margin-top:3px;}
+.iconbtn{flex:none;border:none;background:none;font-size:20px;color:#c4c4c9;padding:6px;cursor:pointer;line-height:1;}
+.iconbtn.on{color:var(--accent);}
+.iconbtn.fav.on{color:#ff9500;}
+
+/* home tiles */
+.tiles{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.tile{background:var(--card);border-radius:var(--radius);box-shadow:0 1px 3px rgba(0,0,0,.06);padding:16px;display:flex;flex-direction:column;gap:8px;cursor:pointer;transition:transform .12s;}
+.tile:active{transform:scale(.97);}
+.tile .ti{font-size:26px;}
+.tile .tl{font-weight:600;font-size:16px;}
+.tile .ts{color:var(--muted);font-size:12px;}
+.bigbtn{width:100%;background:var(--accent);color:#fff;border:none;border-radius:14px;padding:15px;font-size:17px;font-weight:600;margin:6px 0 4px;cursor:pointer;transition:transform .12s;}
+.bigbtn:active{transform:scale(.98);}
+
+/* racconti */
+.plain{font-size:15px;line-height:1.6;}
+.marked{font-size:16px;line-height:1.95;}
+.marked .st{color:#0060df;font-weight:700;}
+.marked .pz{color:var(--red);font-weight:700;}
+.lab{font-weight:600;color:var(--muted);font-size:13px;margin:14px 0 4px;text-transform:uppercase;letter-spacing:.3px;}
+.note{font-size:13px;color:var(--muted);font-style:italic;margin:8px 0;}
+.pron{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:6px 0;}
+.pchip{background:#f2f2f7;border-radius:10px;padding:7px 10px;font-size:12.5px;}
+.pchip b{color:var(--accent);}
+
+/* flashcard */
+.flashwrap{padding:10px 4px;}
+.flash{background:var(--card);border-radius:22px;box-shadow:0 4px 16px rgba(0,0,0,.08);padding:36px 20px;text-align:center;min-height:210px;
+  display:flex;flex-direction:column;justify-content:center;gap:8px;cursor:pointer;transition:transform .12s;}
+.flash:active{transform:scale(.99);}
+.flash .fw{font-size:30px;font-weight:700;letter-spacing:-.5px;}
+.flash .fpr{color:var(--accent);font-style:italic;font-size:16px;}
+.flash .fa{font-size:22px;color:#1f9d43;margin-top:14px;min-height:26px;}
+.flash .hint{color:var(--muted);font-size:13px;margin-top:14px;}
+.fbtns{display:flex;gap:12px;margin-top:16px;}
+.fbtns button{flex:1;padding:15px;border-radius:14px;border:none;font-size:16px;font-weight:600;cursor:pointer;transition:transform .12s;}
+.fbtns button:active{transform:scale(.97);}
+.know{background:var(--green);color:#fff;}
+.again{background:#fff;color:var(--accent);box-shadow:inset 0 0 0 1.5px var(--accent);}
+.fcount{text-align:center;color:var(--muted);font-size:13px;margin-top:12px;}
+
+/* tab bar */
+#tabbar{position:fixed;left:0;right:0;bottom:0;z-index:30;display:flex;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);
+  border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom);height:calc(var(--tabh) + env(safe-area-inset-bottom));}
+#tabbar button{flex:1;border:none;background:none;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;
+  color:var(--muted);font-size:10px;font-weight:500;cursor:pointer;}
+#tabbar button.active{color:var(--accent);}
+#tabbar svg{width:24px;height:24px;}
+
+.empty{text-align:center;color:var(--muted);padding:36px 12px;font-size:15px;}
+.fade{animation:fade .22s ease;}
+@keyframes fade{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:none;}}
