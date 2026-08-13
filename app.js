@@ -24,11 +24,22 @@
   function speak(text) {
     try {
       if (!('speechSynthesis' in window)) return;
+      speechSynthesis.cancel();
       var u = new SpeechSynthesisUtterance(text);
       u.lang = 'en-GB'; u.rate = 0.9;
-      speechSynthesis.cancel(); speechSynthesis.speak(u);
+      var vs = speechSynthesis.getVoices();
+      var v = vs.filter(function (x) { return /^en(-|_)?(GB|US|AU)?/i.test(x.lang); })[0];
+      if (v) u.voice = v;
+      speechSynthesis.speak(u);
     } catch (e) {}
   }
+  // iOS: "sblocca" la sintesi vocale al primo tocco (altrimenti a volte resta muta)
+  var voiceReady = false;
+  document.addEventListener('touchstart', function () {
+    if (voiceReady || !('speechSynthesis' in window)) return;
+    voiceReady = true;
+    try { var w = new SpeechSynthesisUtterance(' '); w.volume = 0; speechSynthesis.speak(w); } catch (e) {}
+  }, { once: false, passive: true });
   function keyOf(en) { return en.toLowerCase().replace(/^(to be |to have |to |a |an |the )/, ''); }
 
   /* ---------- icons (SVG puliti) ---------- */
@@ -169,19 +180,30 @@
 
   /* ---------- flashcard ---------- */
   var card = null, revealed = false;
+  // mazzo flashcard = TUTTO ciò che hai incontrato: vocaboli + modi di dire + espressioni delle canzoni
+  function flashPool() {
+    var a = [];
+    D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: d.extra }); });
+    D.idiomi.forEach(function (d, i) { a.push({ id: 'i' + i, en: d.en, it: d.it, pr: '' }); });
+    D.canzoni.forEach(function (s, si) { s.items.forEach(function (d, ii) { a.push({ id: 's' + si + '_' + ii, en: d.en, it: d.it, pr: '' }); }); });
+    return a;
+  }
   function pickCard() {
-    var pool = review.size ? D.vocab.filter(function (d, i) { return review.has('v' + i); }) : D.vocab;
-    if (!pool.length) pool = D.vocab;
+    var all = flashPool();
+    var pool = review.size ? all.filter(function (x) { return review.has(x.id); }) : all;
+    if (!pool.length) pool = all;
     card = pool[Math.floor(Math.random() * pool.length)];
-    card._i = D.vocab.indexOf(card); revealed = false;
+    revealed = false;
   }
   function flashScreen() {
     if (!card) pickCard();
+    var word = esc(card.en.replace(/\(.*?\)/g, ''));
     var body = '<div class="flashwrap"><div class="flash" data-act="reveal">' +
-      '<div class="fw">' + esc(card.en) + '</div>' + (card.extra ? '<div class="fpr">/' + esc(card.extra) + '/</div>' : '') +
+      '<div class="fw">' + esc(card.en) + '</div>' + (card.pr ? '<div class="fpr">/' + esc(card.pr) + '/</div>' : '') +
       (revealed ? '<div class="fa">' + esc(card.it) + '</div>' : '<div class="hint">tocca per vedere la traduzione</div>') + '</div>' +
+      '<button class="fspk" data-act="speak" data-arg="' + word + '">' + IC.speaker + '<span>Ascolta</span></button>' +
       (revealed ? '<div class="fbtns"><button class="again" data-act="again">↺ Ripassa</button><button class="know" data-act="know">✓ Conosciuta</button></div>' : '') +
-      '<div class="fcount">' + (review.size ? review.size + ' da ripassare' : D.vocab.length + ' parole') + '</div></div>';
+      '<div class="fcount">' + (review.size ? review.size + ' da ripassare' : flashPool().length + ' voci (vocaboli + modi di dire + canzoni)') + '</div></div>';
     return topBar('Flashcard') + '<main>' + body + '</main>';
   }
 
@@ -248,16 +270,23 @@
     if (act === 'go') go(arg);
     else if (act === 'go2') {
       if (arg.indexOf('racc:') === 0) { var i = +arg.slice(5); var t = (D.racconti[i].title.match(/^(.*?)\s*\(/) || [, D.racconti[i].title])[1].trim(); pushRecent({ id: arg, label: 'Racconto: ' + t }); go('racc', i); }
+      else if (arg.indexOf('rule:') === 0) { var rn = +arg.slice(5); openRules.add(rn); go('regole'); setTimeout(function () { var rc = document.querySelector('.card[data-rule="' + rn + '"]'); if (rc) rc.scrollIntoView({ block: 'center' }); }, 50); }
     }
     else if (act === 'rule') {
-      var n = +arg; if (openRules.has(n)) openRules.delete(n); else { openRules.add(n); var r = D.rules.find(function (x) { return x.n === n; }); pushRecent({ id: 'rule:' + n, label: 'Regola ' + n + ': ' + r.title }); }
-      var c = document.querySelector('.card[data-rule="' + n + '"]'); if (c) { c.classList.toggle('open'); render(); }
+      // apri/chiudi la card SUL POSTO, senza ricostruire la schermata (niente salto di scroll)
+      var n = +arg, cardEl = el.closest('.card');
+      if (openRules.has(n)) { openRules.delete(n); if (cardEl) cardEl.classList.remove('open'); }
+      else {
+        openRules.add(n); if (cardEl) cardEl.classList.add('open');
+        var r = D.rules.find(function (x) { return x.n === n; });
+        if (r) pushRecent({ id: 'rule:' + n, label: 'Regola ' + n + ': ' + r.title });
+      }
     }
     else if (act === 'fav') { if (fav.has(arg)) fav.delete(arg); else fav.add(arg); saveFav(); render(); e.stopPropagation(); }
     else if (act === 'speak') { speak(arg); e.stopPropagation(); }
     else if (act === 'reveal') { revealed = true; render(); }
-    else if (act === 'know') { review.delete('v' + card._i); saveReview(); pickCard(); render(); }
-    else if (act === 'again') { review.add('v' + card._i); saveReview(); pickCard(); render(); }
+    else if (act === 'know') { review.delete(card.id); saveReview(); pickCard(); render(); }
+    else if (act === 'again') { review.add(card.id); saveReview(); pickCard(); render(); }
   });
   document.addEventListener('input', function (e) {
     if (e.target.id !== 'q') return;
