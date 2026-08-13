@@ -121,6 +121,8 @@
     if (route.name === 'racconti') return raccontiScreen();
     if (route.name === 'racc') return raccDetail(route.arg);
     if (route.name === 'preferiti') return preferitiScreen();
+    if (route.name === 'componi') return componiScreen();
+    if (route.name === 'composed') return composedScreen();
     return home();
   }
   function topBar(title, back) {
@@ -207,6 +209,52 @@
     return topBar('Flashcard') + '<main>' + body + '</main>';
   }
 
+  /* ---------- Frase del giorno (componi) ---------- */
+  var composePrompt = null;
+  function pickCompose() { var p = flashPool(); composePrompt = p[Math.floor(Math.random() * p.length)]; }
+  function componiScreen() {
+    if (!composePrompt) pickCompose();
+    var c = composePrompt, word = esc(c.en.replace(/\(.*?\)/g, ''));
+    var saved = load('composed', []);
+    return topBar('Frase del giorno') + '<main class="fade">' +
+      '<div class="prompt">' +
+      '<div class="pl">Scrivi una frase usando:</div>' +
+      '<div class="pw">' + esc(c.en) + '</div>' + (c.pr ? '<div class="fpr">/' + esc(c.pr) + '/</div>' : '') +
+      '<div class="pt">' + esc(c.it) + '</div>' +
+      '<button class="fspk" data-act="speak" data-arg="' + word + '">' + IC.speaker + '<span>Ascolta</span></button>' +
+      '</div>' +
+      '<textarea id="compose" class="compose" placeholder="Scrivi qui la tua frase in inglese…"></textarea>' +
+      '<div class="cbtns"><button class="cbtn check" data-act="compose-check">Controlla</button><button class="cbtn save" data-act="compose-save">Salva</button><button class="cbtn next" data-act="compose-next">Prossima →</button></div>' +
+      '<div id="hints"></div>' +
+      '<div class="savedlink" data-act="go" data-arg="composed">Le tue frasi salvate (' + saved.length + ') ›</div>' +
+      '</main>';
+  }
+  // Controllo offline: riconosce SOLO gli errori tipici, non tutto.
+  function checkSentence(t) {
+    var h = [], s = ' ' + t.toLowerCase().replace(/[’]/g, "'") + ' ';
+    if (/(go|goes|going|went|come|comes|coming|came|return|returns|returned|get|gets|getting|got|arrive|arrives|arrived)\s+(back\s+)?at\s+home/.test(s)) h.push('“home” col movimento va senza preposizione: return home, get home (non “at home”).');
+    if (/keen on to/.test(s)) h.push('“keen on” + -ing (keen on drinking) oppure “keen to” + verbo (keen to drink).');
+    if (/\b(don't|doesn't|didn't|can't|won't|isn't|aren't|haven't|hasn't|not)\b[^.!?]*\b(no|nothing|never|nobody|nowhere|none)\b/.test(s)) h.push('Doppia negazione: in inglese si usa UNA sola negazione.');
+    if (/check(ed|ing)? out\s+(my\s+)?(e-?mail|mail|inbox)/.test(s)) h.push('Si dice “check my email”, non “check out”.');
+    if (/\b(informations|advices|peoples|furnitures|homeworks|breads)\b/.test(s)) h.push('Nome non numerabile → niente plurale (information, advice, people…).');
+    if (/\bmore\s+(big|small|old|new|tall|short|fast|slow|hot|cold|nice|easy|young|long|high|low|cheap)\b/.test(s)) h.push('Aggettivo corto → forma in -er (bigger), non “more big”.');
+    if (/\bthe most\s+(big|small|old|new|tall|short|fast|slow|hot|cold|nice|easy|young|long|high|low|cheap)\b/.test(s)) h.push('Superlativo corto → the …-est (the biggest), non “the most big”.');
+    if (/\bgift(s|ed)?\s+(me|him|her|them|us|a |an |the )/.test(s)) h.push('Come verbo si usa “give” (he gives her…), non “gift”.');
+    if (/\beveryday\b/.test(s)) h.push('“everyday” = quotidiano (aggettivo); “ogni giorno” = every day (staccato).');
+    if (/\ba\s+[aeiou]/.test(s)) h.push('Prima di un suono vocalico va “an” (an apple, an hour).');
+    if (/\bmuch\s+(cars|people|friends|books|things|dogs|cats|children|apples|words|days|years|houses)\b/.test(s)) h.push('Con i numerabili plurali si usa “many”, non “much”.');
+    if (/\b(he|she|it)\s+don't\b/.test(s)) h.push('Terza persona: doesn’t (non “don’t”): he/she/it doesn’t.');
+    if (/\bi'm keen\b[^.]*\bto\b/.test(s) && !/keen to /.test(s)) { /* già coperto sopra */ }
+    return h;
+  }
+  function composedScreen() {
+    var arr = load('composed', []);
+    var body = arr.length ? arr.map(function (x, i) {
+      return '<div class="row"><div class="main"><div class="en">' + esc(x.p) + '</div><div class="cs">' + esc(x.s) + '</div><div class="dt">' + esc(x.d || '') + '</div></div><button class="iconbtn" data-act="compose-del" data-arg="' + i + '" aria-label="Elimina">✕</button></div>';
+    }).join('') : '<div class="empty">Nessuna frase salvata ancora.<br>Scrivi una frase in “Frase del giorno” e salvala.</div>';
+    return topBar('Le tue frasi', 'componi') + '<main class="fade"><p class="note" style="padding:0 4px 4px">Copiale e portamele in chat per la correzione a fondo, o incollale su LanguageTool.</p>' + body + '</main>';
+  }
+
   /* ---------- home ---------- */
   function home() {
     return '<div class="top"><span class="title">Il mio inglese</span></div>' +
@@ -215,7 +263,8 @@
   }
   function homeBody(term) {
     if (term && term.trim()) return searchAll(term.trim().toLowerCase());
-    var out = '<button class="bigbtn" data-act="go" data-arg="flashcard">▶︎  Riprendi studio (flashcard)</button>';
+    var out = '<button class="bigbtn" data-act="go" data-arg="flashcard">▶︎  Riprendi studio</button>' +
+      '<button class="bigbtn alt" data-act="go" data-arg="componi">✎  Frase del giorno</button>';
     if (recent.length) {
       out += '<div class="hgroup">Ultime aperte</div>';
       out += recent.map(function (r) { return '<div class="card" data-act="go2" data-arg="' + r.id + '"><div class="head"><span class="ctitle">' + esc(r.label) + '</span><span class="chev">›</span></div></div>'; }).join('');
@@ -225,6 +274,7 @@
       tile('vocab', '🔤', 'Vocabolario', D.vocab.length + ' parole') +
       tile('frasi', '💬', 'Modi di dire', D.idiomi.length + ' frasi') +
       tile('flashcard', '🃏', 'Flashcard', 'Ripassa') +
+      tile('componi', '✍️', 'Frase del giorno', 'Esercitati') +
       tile('canzoni', '🎵', 'Canzoni', D.canzoni.length + ' brani') +
       tile('racconti', '📖', 'Racconti', D.racconti.length + ' testi') +
       tile('preferiti', '⭐', 'Preferiti', fav.size + ' salvati') +
@@ -287,6 +337,23 @@
     else if (act === 'reveal') { revealed = true; render(); }
     else if (act === 'know') { review.delete(card.id); saveReview(); pickCard(); render(); }
     else if (act === 'again') { review.add(card.id); saveReview(); pickCard(); render(); }
+    else if (act === 'compose-check') {
+      var cv = (document.getElementById('compose') || {}).value || '', box = document.getElementById('hints');
+      if (!box) return;
+      if (!cv.trim()) { box.innerHTML = '<div class="hint2">Scrivi prima una frase.</div>'; return; }
+      var hs = checkSentence(cv);
+      box.innerHTML = hs.length
+        ? '<div class="hint2 warn"><b>Da controllare:</b>' + hs.map(function (h) { return '<div class="hi">' + esc(h) + '</div>'; }).join('') + '</div>'
+        : '<div class="hint2 ok">Nessun errore tipico rilevato. Rileggi comunque, o incolla su LanguageTool per sicurezza.</div>';
+    }
+    else if (act === 'compose-save') {
+      var sv = (document.getElementById('compose') || {}).value || '';
+      if (!sv.trim()) return;
+      var arr = load('composed', []); arr.unshift({ p: composePrompt.en, s: sv, d: new Date().toLocaleDateString('it-IT') }); save('composed', arr);
+      var b = document.getElementById('hints'); if (b) b.innerHTML = '<div class="hint2 ok">Frase salvata. La ritrovi in “Le tue frasi salvate”.</div>';
+    }
+    else if (act === 'compose-next') { pickCompose(); go('componi'); }
+    else if (act === 'compose-del') { var a3 = load('composed', []); a3.splice(+arg, 1); save('composed', a3); render(); }
   });
   document.addEventListener('input', function (e) {
     if (e.target.id !== 'q') return;
