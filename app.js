@@ -192,7 +192,11 @@
   }
   function pickCard() {
     var all = flashPool();
-    var pool = review.size ? all.filter(function (x) { return review.has(x.id); }) : all;
+    var prev = card ? card.id : null;
+    // le carte "da ripassare" compaiono più spesso (x3), ma si avanza SEMPRE a una carta diversa
+    var weighted = [];
+    all.forEach(function (x) { weighted.push(x); if (review.has(x.id)) { weighted.push(x); weighted.push(x); } });
+    var pool = weighted.filter(function (x) { return x.id !== prev; });
     if (!pool.length) pool = all;
     card = pool[Math.floor(Math.random() * pool.length)];
     revealed = false;
@@ -205,7 +209,7 @@
       (revealed ? '<div class="fa">' + esc(card.it) + '</div>' : '<div class="hint">tocca per vedere la traduzione</div>') + '</div>' +
       '<button class="fspk" data-act="speak" data-arg="' + word + '">' + IC.speaker + '<span>Ascolta</span></button>' +
       (revealed ? '<div class="fbtns"><button class="again" data-act="again">↺ Ripassa</button><button class="know" data-act="know">✓ Conosciuta</button></div>' : '') +
-      '<div class="fcount">' + (review.size ? review.size + ' da ripassare' : flashPool().length + ' voci (vocaboli + modi di dire + canzoni)') + '</div></div>';
+      '<div class="fcount">' + flashPool().length + ' voci' + (review.size ? ' · ' + review.size + ' da ripassare (più frequenti)' : '') + '</div></div>';
     return topBar('Flashcard') + '<main>' + body + '</main>';
   }
 

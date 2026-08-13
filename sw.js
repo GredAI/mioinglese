@@ -1,5 +1,5 @@
 /* Service worker — cache per uso offline. Cambia CACHE per forzare l'aggiornamento. */
-var CACHE = 'inglese-v5';
+var CACHE = 'inglese-v6';
 var ASSETS = [
   './', './index.html', './style.css', './app.js', './data.js',
   './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'
@@ -14,8 +14,15 @@ self.addEventListener('activate', function (e) {
   }));
   self.clients.claim();
 });
+// Network-first: se c'è rete prende sempre l'ultima versione (e aggiorna la cache),
+// altrimenti usa la copia salvata (offline).
 self.addEventListener('fetch', function (e) {
+  if (e.request.method !== 'GET') return;
   e.respondWith(
-    caches.match(e.request).then(function (r) { return r || fetch(e.request); })
+    fetch(e.request).then(function (res) {
+      var copy = res.clone();
+      caches.open(CACHE).then(function (c) { c.put(e.request, copy); });
+      return res;
+    }).catch(function () { return caches.match(e.request); })
   );
 });
