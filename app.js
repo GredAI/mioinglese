@@ -186,15 +186,22 @@
   /* ---------- flashcard ---------- */
   var card = null, revealed = false;
   // mazzo flashcard = TUTTO ciò che hai incontrato: vocaboli + modi di dire + espressioni delle canzoni
+  var flashDeck = load('flashDeck', 'all'); // 'all' | 'voc' | 'phr'
   function flashPool() {
     var a = [];
-    D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: d.extra }); });
-    D.idiomi.forEach(function (d, i) { a.push({ id: 'i' + i, en: d.en, it: d.it, pr: '' }); });
-    D.canzoni.forEach(function (s, si) { s.items.forEach(function (d, ii) { a.push({ id: 's' + si + '_' + ii, en: d.en, it: d.it, pr: '' }); }); });
+    D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: d.extra, ty: 'voc' }); });
+    D.idiomi.forEach(function (d, i) { a.push({ id: 'i' + i, en: d.en, it: d.it, pr: '', ty: 'phr' }); });
+    D.canzoni.forEach(function (s, si) { s.items.forEach(function (d, ii) { a.push({ id: 's' + si + '_' + ii, en: d.en, it: d.it, pr: '', ty: 'phr' }); }); });
     return a;
   }
-  function pickCard() {
+  function deckPool() {
     var all = flashPool();
+    if (flashDeck === 'voc') return all.filter(function (x) { return x.ty === 'voc'; });
+    if (flashDeck === 'phr') return all.filter(function (x) { return x.ty === 'phr'; });
+    return all;
+  }
+  function pickCard() {
+    var all = deckPool();
     var prev = card ? card.id : null;
     // le carte "da ripassare" compaiono più spesso (x3), ma si avanza SEMPRE a una carta diversa
     var weighted = [];
@@ -207,13 +214,17 @@
   function flashScreen() {
     if (!card) pickCard();
     var word = esc(card.en.replace(/\(.*?\)/g, ''));
+    var seg = '<div class="fseg">' +
+      '<button class="' + (flashDeck === 'all' ? 'on' : '') + '" data-act="deck" data-arg="all">Tutto</button>' +
+      '<button class="' + (flashDeck === 'voc' ? 'on' : '') + '" data-act="deck" data-arg="voc">Vocaboli</button>' +
+      '<button class="' + (flashDeck === 'phr' ? 'on' : '') + '" data-act="deck" data-arg="phr">Frasi</button></div>';
     var body = '<div class="flashwrap"><div class="flash" data-act="reveal">' +
       '<div class="fw">' + esc(card.en) + '</div>' + (card.pr ? '<div class="fpr">/' + esc(card.pr) + '/</div>' : '') +
       (revealed ? '<div class="fa">' + esc(card.it) + '</div>' : '<div class="hint">tocca per vedere la traduzione</div>') + '</div>' +
       '<button class="fspk" data-act="speak" data-arg="' + word + '">' + IC.speaker + '<span>Ascolta</span></button>' +
       (revealed ? '<div class="fbtns"><button class="again" data-act="again">↺ Ripassa</button><button class="know" data-act="know">✓ Conosciuta</button></div>' : '') +
-      '<div class="fcount">' + flashPool().length + ' voci' + (review.size ? ' · ' + review.size + ' da ripassare (più frequenti)' : '') + '</div></div>';
-    return topBar('Flashcard') + '<main>' + body + '</main>';
+      '<div class="fcount">' + deckPool().length + ' carte' + (review.size ? ' · ' + review.size + ' da ripassare (più frequenti)' : '') + '</div></div>';
+    return topBar('Flashcard') + '<main>' + seg + body + '</main>';
   }
 
   /* ---------- Frase del giorno (componi) ---------- */
@@ -359,6 +370,7 @@
       var arr = load('composed', []); arr.unshift({ p: composePrompt.en, s: sv, d: new Date().toLocaleDateString('it-IT') }); save('composed', arr);
       var b = document.getElementById('hints'); if (b) b.innerHTML = '<div class="hint2 ok">Frase salvata. La ritrovi in “Le tue frasi salvate”.</div>';
     }
+    else if (act === 'deck') { flashDeck = arg; save('flashDeck', flashDeck); card = null; pickCard(); render(); }
     else if (act === 'compose-next') { pickCompose(); go('componi'); }
     else if (act === 'compose-del') { var a3 = load('composed', []); a3.splice(+arg, 1); save('composed', a3); render(); }
   });
