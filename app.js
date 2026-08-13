@@ -21,11 +21,14 @@
     s = s.replace(/\*\*(.+?)\*\*/g, '<b class="st">$1</b>');
     return s.split('').join('<span class="pz">//</span>').split('').join('<span class="pz">/</span>');
   }
+  // parole che la voce del telefono legge male → le facciamo pronunciare con un omofono/spelling corretto
+  var SAY = { hour: 'our' };
   function speak(text) {
     try {
       if (!('speechSynthesis' in window)) return;
       speechSynthesis.cancel();
-      var u = new SpeechSynthesisUtterance(text);
+      var say = SAY[text.trim().toLowerCase()] || text;
+      var u = new SpeechSynthesisUtterance(say);
       u.lang = 'en-GB'; u.rate = 0.9;
       var vs = speechSynthesis.getVoices();
       var v = vs.filter(function (x) { return /^en(-|_)?(GB|US|AU)?/i.test(x.lang); })[0];

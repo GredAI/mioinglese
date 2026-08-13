@@ -1,5 +1,5 @@
 /* Service worker — cache per uso offline. Cambia CACHE per forzare l'aggiornamento. */
-var CACHE = 'inglese-v6';
+var CACHE = 'inglese-v7';
 var ASSETS = [
   './', './index.html', './style.css', './app.js', './data.js',
   './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'
