@@ -125,6 +125,7 @@
     if (route.name === 'flashcard') return flashScreen();
     if (route.name === 'canzoni') return listScreen('Canzoni', 'Cerca…', canzoniBody, true);
     if (route.name === 'racconti') return raccontiScreen();
+    if (route.name === 'schemi') return schemiScreen();
     if (route.name === 'racc') return raccDetail(route.arg);
     if (route.name === 'preferiti') return preferitiScreen();
     if (route.name === 'componi') return componiScreen();
@@ -227,6 +228,20 @@
     return topBar(title, 'racconti') + '<main class="fade"><div style="background:#fff;border-radius:16px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:16px">' + body + '</div></main>';
   }
 
+  /* ---------- schemi (tabelle di riferimento rapido) ---------- */
+  function schemiScreen() {
+    var list = (D.schemi || []).map(function (s) {
+      var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
+      var rows = s.rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('');
+      return '<div class="schemecard">' +
+        '<div class="schemetitle">' + esc(s.title) + '</div>' +
+        '<div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
+        (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') +
+        '</div>';
+    }).join('') || '<div class="empty">Nessuno schema ancora.</div>';
+    return topBar('Schemi', 'home') + '<main class="fade">' + list + '</main>';
+  }
+
   /* ---------- flashcard ---------- */
   var card = null, revealed = false;
   // mazzo flashcard = TUTTO ciò che hai incontrato: vocaboli + modi di dire + espressioni delle canzoni
@@ -322,7 +337,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v14</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v15</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -336,6 +351,7 @@
     }
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
+      tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
       tile('vocab', '🔤', 'Vocabolario', D.vocab.length + ' parole') +
       tile('frasi', '💬', 'Modi di dire', D.idiomi.length + ' frasi') +
       tile('phrasal', '🔗', 'Phrasal verbs', (D.phrasal ? D.phrasal.length : 0) + ' verbi') +
