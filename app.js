@@ -82,13 +82,15 @@
   /* ---------- rendering pieces ---------- */
   function ruleCard(r, open) {
     var desc = (r.items[0] && r.items[0].s ? r.items[0].s.replace(/\*\*/g, '') : '');
+    var chars = r.items.map(function (i) { return i.s || ''; }).join(' ').length;
+    var lunga = chars > 500 ? '<span class="lunga">LUNGA</span>' : '';
     var body = r.items.map(function (it) {
       if (it.t === 'exp') return '<p class="exp">' + bold(it.s) + '</p>';
       return '<div class="exline ' + it.t + '"><b>' + (it.t === 'wrong' ? '✗' : '✓') + '</b>' + esc(it.s) + '</div>';
     }).join('');
     return '<div class="card ' + (open ? 'open' : '') + '" data-rule="' + r.n + '">' +
       '<div class="head" data-act="rule" data-arg="' + r.n + '"><span class="num">' + r.n + '</span>' +
-      '<span class="ctitle">' + esc(r.title) + (open ? '' : '<span class="cdesc">' + esc(desc.slice(0, 70)) + (desc.length > 70 ? '…' : '') + '</span>') + '</span>' +
+      '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc">' + esc(desc.slice(0, 70)) + (desc.length > 70 ? '…' : '') + '</span>') + '</span>' +
       favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
       '<div class="body"><div class="body-in">' + body + '</div></div></div>';
   }
@@ -137,11 +139,31 @@
       '<div class="search"><input id="q" type="search" placeholder="' + ph + '" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + bodyFn('') + '</main>';
   }
+  var regCat = 'all'; // categoria selezionata nel tab Regole
   function regoleBody(term) {
     var t = term.toLowerCase();
-    var items = D.rules.filter(function (r) { return !t || (r.title + ' ' + r.items.map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; });
-    if (!items.length) return '<div class="empty">Nessuna regola trovata.</div>';
-    return items.map(function (r) { return ruleCard(r, openRules.has(r.n)); }).join('');
+    var cats = D.catOrder || [];
+    function match(r) { return !t || (r.title + ' ' + r.items.map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; }
+    var matched = D.rules.filter(match);
+    // barra dei chip (categorie), con conteggio in base alla ricerca
+    var chips = '<button class="chip2 ' + (regCat === 'all' ? 'on' : '') + '" data-act="regcat" data-arg="all">Tutte (' + matched.length + ')</button>';
+    cats.forEach(function (c) {
+      var n = matched.filter(function (r) { return r.cat === c; }).length;
+      if (!n) return;
+      chips += '<button class="chip2 ' + (regCat === c ? 'on' : '') + '" data-act="regcat" data-arg="' + esc(c) + '">' + esc(c) + ' (' + n + ')</button>';
+    });
+    var chipbar = '<div class="chips">' + chips + '</div>';
+    var shown = matched.filter(function (r) { return regCat === 'all' || r.cat === regCat; });
+    if (!shown.length) return chipbar + '<div class="empty">Nessuna regola trovata.</div>';
+    // raggruppa per categoria, nell'ordine definito
+    var out = '';
+    cats.forEach(function (c) {
+      if (regCat !== 'all' && c !== regCat) return;
+      var rs = shown.filter(function (r) { return r.cat === c; });
+      if (!rs.length) return;
+      out += '<div class="hgroup">' + esc(c) + '</div>' + rs.map(function (r) { return ruleCard(r, openRules.has(r.n)); }).join('');
+    });
+    return chipbar + out;
   }
   function vocabBody(term) {
     var t = term.toLowerCase();
@@ -300,7 +322,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v13</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v14</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -380,6 +402,7 @@
         if (r) pushRecent({ id: 'rule:' + n, label: 'Regola ' + n + ': ' + r.title });
       }
     }
+    else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
     else if (act === 'fav') { if (fav.has(arg)) fav.delete(arg); else fav.add(arg); saveFav(); render(); e.stopPropagation(); }
     else if (act === 'speak') { speak(arg); e.stopPropagation(); }
     else if (act === 'reveal') { revealed = true; render(); }
