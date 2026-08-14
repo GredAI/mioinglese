@@ -119,6 +119,7 @@
     if (route.name === 'regole') return listScreen('Regole', 'Cerca una regola…', regoleBody);
     if (route.name === 'vocab') return listScreen('Vocabolario', 'Cerca una parola…', vocabBody);
     if (route.name === 'frasi') return listScreen('Modi di dire', 'Cerca un modo di dire…', frasiBody);
+    if (route.name === 'phrasal') return listScreen('Phrasal verbs', 'Cerca un phrasal verb…', phrasalBody, true);
     if (route.name === 'flashcard') return flashScreen();
     if (route.name === 'canzoni') return listScreen('Canzoni', 'Cerca…', canzoniBody, true);
     if (route.name === 'racconti') return raccontiScreen();
@@ -151,6 +152,27 @@
     var t = term.toLowerCase();
     var arr = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return !t || (x.d.en + ' ' + x.d.it + ' ' + x.d.ex).toLowerCase().indexOf(t) >= 0; });
     return alphaList(arr, idiRow);
+  }
+  function phrRow(d, i) {
+    return '<div class="row">' + speakBtn(d.pv.replace(/^to /, '')) +
+      '<div class="main"><div class="line"><span class="en">' + esc(d.pv) + '</span>' +
+      '<span class="it">' + esc(d.it) + '</span></div>' +
+      '<div class="exq">(= ' + esc(d.eq) + ') · ' + esc(d.sep) + '</div>' +
+      (d.ex ? '<div class="exq">' + esc(d.ex) + '</div>' : '') + '</div>' + favBtn('p' + i) + '</div>';
+  }
+  function phrasalBody(term) {
+    var t = term.toLowerCase();
+    var arr = (D.phrasal || []).map(function (d, i) { return { d: d, i: i }; })
+      .filter(function (x) { return !t || (x.d.pv + ' ' + x.d.it + ' ' + x.d.eq + ' ' + x.d.ex).toLowerCase().indexOf(t) >= 0; });
+    arr.sort(function (a, b) { return keyOf(a.d.pv) < keyOf(b.d.pv) ? -1 : 1; });
+    if (!arr.length) return '<div class="empty">Nessun risultato.</div>';
+    var out = '', letter = '';
+    arr.forEach(function (x) {
+      var L = keyOf(x.d.pv)[0].toUpperCase();
+      if (L !== letter) { letter = L; out += '<div class="letter">' + L + '</div>'; }
+      out += phrRow(x.d, x.i);
+    });
+    return out;
   }
   function canzoniBody(term) {
     var t = term.toLowerCase();
@@ -186,18 +208,20 @@
   /* ---------- flashcard ---------- */
   var card = null, revealed = false;
   // mazzo flashcard = TUTTO ciò che hai incontrato: vocaboli + modi di dire + espressioni delle canzoni
-  var flashDeck = load('flashDeck', 'all'); // 'all' | 'voc' | 'phr'
+  var flashDeck = load('flashDeck', 'all'); // 'all' | 'voc' | 'phr' | 'pv'
   function flashPool() {
     var a = [];
     D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: d.extra, ty: 'voc' }); });
     D.idiomi.forEach(function (d, i) { a.push({ id: 'i' + i, en: d.en, it: d.it, pr: '', ty: 'phr' }); });
     D.canzoni.forEach(function (s, si) { s.items.forEach(function (d, ii) { a.push({ id: 's' + si + '_' + ii, en: d.en, it: d.it, pr: '', ty: 'phr' }); }); });
+    if (D.phrasal) D.phrasal.forEach(function (d, i) { a.push({ id: 'p' + i, en: d.pv, it: d.it + ' (= ' + d.eq + ', ' + d.sep + ')', pr: '', ty: 'pv' }); });
     return a;
   }
   function deckPool() {
     var all = flashPool();
     if (flashDeck === 'voc') return all.filter(function (x) { return x.ty === 'voc'; });
     if (flashDeck === 'phr') return all.filter(function (x) { return x.ty === 'phr'; });
+    if (flashDeck === 'pv') return all.filter(function (x) { return x.ty === 'pv'; });
     return all;
   }
   function pickCard() {
@@ -217,7 +241,8 @@
     var seg = '<div class="fseg">' +
       '<button class="' + (flashDeck === 'all' ? 'on' : '') + '" data-act="deck" data-arg="all">Tutto</button>' +
       '<button class="' + (flashDeck === 'voc' ? 'on' : '') + '" data-act="deck" data-arg="voc">Vocaboli</button>' +
-      '<button class="' + (flashDeck === 'phr' ? 'on' : '') + '" data-act="deck" data-arg="phr">Frasi</button></div>';
+      '<button class="' + (flashDeck === 'phr' ? 'on' : '') + '" data-act="deck" data-arg="phr">Frasi</button>' +
+      '<button class="' + (flashDeck === 'pv' ? 'on' : '') + '" data-act="deck" data-arg="pv">Phrasal</button></div>';
     var body = '<div class="flashwrap"><div class="flash" data-act="reveal">' +
       '<div class="fw">' + esc(card.en) + '</div>' + (card.pr ? '<div class="fpr">/' + esc(card.pr) + '/</div>' : '') +
       (revealed ? '<div class="fa">' + esc(card.it) + '</div>' : '<div class="hint">tocca per vedere la traduzione</div>') + '</div>' +
@@ -275,7 +300,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v11</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -291,6 +316,7 @@
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
       tile('vocab', '🔤', 'Vocabolario', D.vocab.length + ' parole') +
       tile('frasi', '💬', 'Modi di dire', D.idiomi.length + ' frasi') +
+      tile('phrasal', '🔗', 'Phrasal verbs', (D.phrasal ? D.phrasal.length : 0) + ' verbi') +
       tile('flashcard', '🃏', 'Flashcard', 'Ripassa') +
       tile('componi', '✍️', 'Frase del giorno', 'Esercitati') +
       tile('canzoni', '🎵', 'Canzoni', D.canzoni.length + ' brani') +
@@ -310,6 +336,8 @@
     if (vv.length) out += '<div class="hgroup">Vocaboli (' + vv.length + ')</div>' + vv.map(function (x) { return vocRow(x.d, x.i); }).join('');
     var ii = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.en + ' ' + x.d.it).toLowerCase().indexOf(t) >= 0; });
     if (ii.length) out += '<div class="hgroup">Modi di dire (' + ii.length + ')</div>' + ii.map(function (x) { return idiRow(x.d, x.i); }).join('');
+    var pp = (D.phrasal || []).map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.pv + ' ' + x.d.it + ' ' + x.d.eq).toLowerCase().indexOf(t) >= 0; });
+    if (pp.length) out += '<div class="hgroup">Phrasal verbs (' + pp.length + ')</div>' + pp.map(function (x) { return phrRow(x.d, x.i); }).join('');
     var cc = D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' ').toLowerCase().indexOf(t) >= 0; });
     if (cc.length) out += '<div class="hgroup">Racconti (' + cc.length + ')</div>' + cc.map(function (x) { var m = x.s.title.match(/^(.*?)\s*\(/); return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(m ? m[1].trim() : x.s.title) + '</span><span class="chev">›</span></div></div>'; }).join('');
     return out || '<div class="empty">Nessun risultato per “' + esc(t) + '”.</div>';
@@ -324,6 +352,8 @@
     if (vv.length) out += '<div class="hgroup">Vocaboli</div>' + vv.join('');
     var ii = []; D.idiomi.forEach(function (d, i) { if (fav.has('i' + i)) ii.push(idiRow(d, i)); });
     if (ii.length) out += '<div class="hgroup">Modi di dire</div>' + ii.join('');
+    var pp = []; (D.phrasal || []).forEach(function (d, i) { if (fav.has('p' + i)) pp.push(phrRow(d, i)); });
+    if (pp.length) out += '<div class="hgroup">Phrasal verbs</div>' + pp.join('');
     if (!out) out = '<div class="empty">Nessun preferito ancora.<br>Tocca il cuore accanto a una regola o parola per salvarla qui.</div>';
     return topBar('Preferiti', 'home') + '<main class="fade">' + out + '</main>';
   }
@@ -382,6 +412,7 @@
     else if (route.name === 'regole') b.innerHTML = regoleBody(term);
     else if (route.name === 'vocab') b.innerHTML = vocabBody(term);
     else if (route.name === 'frasi') b.innerHTML = frasiBody(term);
+    else if (route.name === 'phrasal') b.innerHTML = phrasalBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
   });
 
