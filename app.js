@@ -232,7 +232,13 @@
   function schemiScreen() {
     var list = (D.schemi || []).map(function (s) {
       var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
-      var rows = s.rows.map(function (r) { return '<tr>' + r.map(function (c) { return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; }).join('');
+      var rows = s.rows.map(function (r) {
+        return '<tr>' + r.map(function (c) {
+          var parts = String(c).split('\n');
+          var ex = parts.length > 1 ? '<div class="cex">' + esc(parts.slice(1).join(' ')) + '</div>' : '';
+          return '<td>' + esc(parts[0]) + ex + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
       return '<div class="schemecard">' +
         '<div class="schemetitle">' + esc(s.title) + '</div>' +
         '<div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
@@ -337,7 +343,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v15</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v16</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }

@@ -84,6 +84,7 @@ table.scheme{border-collapse:collapse;width:100%;font-size:15px;}
 table.scheme th{background:var(--accent);color:#fff;font-weight:600;padding:9px 12px;text-align:center;white-space:nowrap;font-size:13px;}
 table.scheme td{padding:9px 12px;text-align:center;border-top:1px solid var(--line);white-space:nowrap;}
 table.scheme tbody tr:nth-child(even){background:#f7f8fa;}
+table.scheme td .cex{font-size:12px;color:var(--muted);font-style:italic;margin-top:3px;}
 .schemenote{font-size:13px;color:var(--muted);font-style:italic;margin:10px 2px 0;}
 
 /* home tiles */
