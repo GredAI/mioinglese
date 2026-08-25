@@ -389,6 +389,34 @@
     if (new RegExp('\\blet\\s+(him|her|them|someone|somebody|me|us)\\s+(else\\s+)?(' + VERB_S + ')\\b').test(s)) h.push('Dopo “let” + persona il verbo va alla forma base, senza -s: let her speak, non let her speaks.');
     if (/\b(listen to|watch|hear)\s+(him|her|them|someone|somebody|me|us|it)\s+to\s+[a-z]+/.test(s)) h.push('Dopo i verbi di percezione (listen to, watch, hear) + persona, il verbo va alla forma base, senza “to”: listen to her talk, non listen to her to talk.');
     if (/\bso that\b(\s+\w+){0,2}\s+to\s+[a-z]+/.test(s)) h.push('Per un risultato non voluto/ironico (“per poi…”) usa “only to” + infinito, non “so that” (che indica uno scopo voluto): I study, only to forget everything.');
+    // --- controlli aggiunti dai Phrasal verbs: preposizione "to" ridondante dopo un phrasal verb non separabile già completo ---
+    // esclusi i phrasal verb dove "…out to", "…on to", "…up to", "…off to" ecc. hanno anche un uso legittimo (rischio falsi positivi)
+    var SKIP_EXTRA_TO = ['to work out', 'to carry on', 'to hang out', 'to back down', 'to get up', 'to be off'];
+    function verbForms(v) {
+      var irr = (D.irregolari || []).find(function (x) { return x.en.replace(/\s*\(.*?\)/, '').trim() === v; });
+      var forms = [v];
+      if (irr) {
+        irr.past.split('/').forEach(function (p) { forms.push(p.replace(/\(.*?\)/, '').trim()); });
+        irr.pp.split('/').forEach(function (p) { forms.push(p.replace(/\(.*?\)/, '').trim()); });
+      } else if (/[^aeiou]y$/.test(v)) forms.push(v.slice(0, -1) + 'ied');
+      else if (/e$/.test(v)) forms.push(v + 'd');
+      else forms.push(v + 'ed');
+      if (/[^aeiou]y$/.test(v)) forms.push(v.slice(0, -1) + 'ies');
+      else if (/(s|sh|ch|x|z|o)$/.test(v)) forms.push(v + 'es');
+      else forms.push(v + 's');
+      if (/e$/.test(v) && v !== 'be') forms.push(v.slice(0, -1) + 'ing');
+      else forms.push(v + 'ing');
+      var seen = {}, out = [];
+      forms.forEach(function (f) { f = f.trim(); if (f && !seen[f]) { seen[f] = 1; out.push(f); } });
+      return out;
+    }
+    (D.phrasal || []).forEach(function (d) {
+      if (d.sep !== 'non separabile' || SKIP_EXTRA_TO.indexOf(d.pv) !== -1) return;
+      var base = d.pv.replace(/^to\s+/i, '');
+      var parts = base.split(' '), verb = parts[0], rest = parts.slice(1).join(' ');
+      var alt = '(' + verbForms(verb).join('|') + ')' + (rest ? '\\s+' + rest : '');
+      if (new RegExp('\\b' + alt + '\\s+to\\b').test(s)) h.push('“' + d.pv + '” è già completo così: non serve “to” dopo (' + d.it.split(/[,·]/)[0].trim() + ').');
+    });
     return h;
   }
   function composedScreen() {
@@ -401,7 +429,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v32</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v33</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
