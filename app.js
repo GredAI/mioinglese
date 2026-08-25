@@ -111,7 +111,7 @@
   }
   function idiRow(d, i) {
     return '<div class="row"><div class="main"><div class="line"><span class="en">' + esc(d.en) + '</span>' +
-      '<span class="it">' + esc(d.it) + '</span></div>' + (d.ex ? '<div class="exq">' + esc(d.ex) + '</div>' : '') + '</div>' +
+      '<span class="it">' + esc(d.it) + '</span></div>' + (d.extra ? '<div class="exq">' + esc(d.extra) + '</div>' : '') + '</div>' +
       favBtn('i' + i) + '</div>';
   }
   function alphaList(arr, rowFn) {
@@ -182,7 +182,7 @@
   }
   function frasiBody(term) {
     var t = term.toLowerCase();
-    var arr = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return !t || (x.d.en + ' ' + x.d.it + ' ' + x.d.ex).toLowerCase().indexOf(t) >= 0; });
+    var arr = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return !t || (x.d.en + ' ' + x.d.it + ' ' + x.d.extra).toLowerCase().indexOf(t) >= 0; });
     return alphaList(arr, idiRow);
   }
   function phrRow(d, i) {
