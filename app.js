@@ -9,9 +9,18 @@
   var fav = new Set(load('fav', []));
   var review = new Set(load('review', []));
   var recent = load('recent', []); if (recent.length > 3) { recent = recent.slice(0, 3); save('recent', recent); }
+  var ruleTag = load('ruleTag', {}); // { '12': 'use', '47': 'learn', ... } — marcatori sulle regole
   function saveFav() { save('fav', Array.from(fav)); }
   function saveReview() { save('review', Array.from(review)); }
   function saveRecent() { save('recent', recent); }
+  function saveRuleTag() { save('ruleTag', ruleTag); }
+  // marcatori disponibili per le regole (indipendenti dai Preferiti ❤️)
+  var RULE_TAGS = {
+    use: { label: 'In uso / ripasso', icon: '📌', color: '#0a84ff' },
+    want: { label: 'Da usare', icon: '🎯', color: '#ff9500' },
+    learn: { label: 'Da capire', icon: '❓', color: '#ff3b30' }
+  };
+  var RULE_TAG_ORDER = ['use', 'want', 'learn'];
 
   /* ---------- helpers ---------- */
   function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
@@ -93,15 +102,21 @@
     var desc = (r.items[0] && r.items[0].s ? r.items[0].s.replace(/\*\*/g, '') : '');
     var chars = r.items.map(function (i) { return i.s || ''; }).join(' ').length;
     var lunga = chars > 500 ? '<span class="lunga">LUNGA</span>' : '';
+    var tag = ruleTag[r.n];
+    var dot = tag ? '<span class="tagdot" style="background:' + RULE_TAGS[tag].color + '" title="' + esc(RULE_TAGS[tag].label) + '"></span>' : '';
     var body = r.items.map(function (it) {
       if (it.t === 'exp') return '<p class="exp">' + bold(it.s) + '</p>';
       return '<div class="exline ' + it.t + '"><b>' + (it.t === 'wrong' ? '✗' : '✓') + '</b>' + esc(it.s) + '</div>';
     }).join('');
+    var tagbar = '<div class="tagbar">' + RULE_TAG_ORDER.map(function (k) {
+      var on = tag === k, tg = RULE_TAGS[k];
+      return '<button class="tagbtn' + (on ? ' on' : '') + '" style="' + (on ? 'background:' + tg.color + ';color:#fff' : '') + '" data-act="ruletag" data-arg="' + r.n + ':' + k + '">' + tg.icon + ' ' + tg.label + '</button>';
+    }).join('') + '</div>';
     return '<div class="card ' + (open ? 'open' : '') + '" data-rule="' + r.n + '">' +
       '<div class="head" data-act="rule" data-arg="' + r.n + '"><span class="num">' + r.n + '</span>' +
       '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc">' + esc(desc.slice(0, 70)) + (desc.length > 70 ? '…' : '') + '</span>') + '</span>' +
-      favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
-      '<div class="body"><div class="body-in">' + body + '</div></div></div>';
+      dot + favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
+      '<div class="body"><div class="body-in">' + tagbar + body + '</div></div></div>';
   }
   function vocRow(v, i) {
     return '<div class="row">' + speakBtn(v.en.replace(/\(.*?\)/g, '')) +
@@ -150,6 +165,7 @@
       '<main class="fade" id="body">' + bodyFn('') + '</main>';
   }
   var regCat = 'all'; // categoria selezionata nel tab Regole
+  var regTag = 'all'; // marcatore selezionato nel tab Regole (all/use/want/learn)
   function regoleBody(term) {
     var t = term.toLowerCase();
     var cats = D.catOrder || [];
@@ -163,8 +179,16 @@
       chips += '<button class="chip2 ' + (regCat === c ? 'on' : '') + '" data-act="regcat" data-arg="' + esc(c) + '">' + esc(c) + ' (' + n + ')</button>';
     });
     var chipbar = '<div class="chips">' + chips + '</div>';
-    var shown = matched.filter(function (r) { return regCat === 'all' || r.cat === regCat; });
-    if (!shown.length) return chipbar + '<div class="empty">Nessuna regola trovata.</div>';
+    // barra dei marcatori (📌/🎯/❓), indipendente dalla categoria
+    var tagChips = '<button class="chip2 ' + (regTag === 'all' ? 'on' : '') + '" data-act="regtag" data-arg="all">Tutte le regole</button>';
+    RULE_TAG_ORDER.forEach(function (k) {
+      var tg = RULE_TAGS[k], n = matched.filter(function (r) { return ruleTag[r.n] === k; }).length;
+      var on = regTag === k;
+      tagChips += '<button class="chip2 ' + (on ? 'on' : '') + '" style="' + (on ? 'background:' + tg.color + ';border-color:' + tg.color + ';color:#fff' : '') + '" data-act="regtag" data-arg="' + k + '">' + tg.icon + ' ' + tg.label + ' (' + n + ')</button>';
+    });
+    var tagChipbar = '<div class="chips">' + tagChips + '</div>';
+    var shown = matched.filter(function (r) { return (regCat === 'all' || r.cat === regCat) && (regTag === 'all' || ruleTag[r.n] === regTag); });
+    if (!shown.length) return chipbar + tagChipbar + '<div class="empty">Nessuna regola trovata.</div>';
     // raggruppa per categoria, nell'ordine definito
     var out = '';
     cats.forEach(function (c) {
@@ -173,7 +197,7 @@
       if (!rs.length) return;
       out += '<div class="hgroup">' + esc(c) + '</div>' + rs.map(function (r) { return ruleCard(r, openRules.has(r.n)); }).join('');
     });
-    return chipbar + out;
+    return chipbar + tagChipbar + out;
   }
   function vocabBody(term) {
     var t = term.toLowerCase();
@@ -352,7 +376,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v29</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v30</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -434,6 +458,34 @@
       }
     }
     else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
+    else if (act === 'regtag') { regTag = arg; var qc3 = document.getElementById('q'); var bc3 = document.getElementById('body'); if (bc3) bc3.innerHTML = regoleBody(qc3 ? qc3.value : ''); window.scrollTo(0, 0); }
+    else if (act === 'ruletag') {
+      var rtParts = arg.split(':'), rn = rtParts[0], k = rtParts[1];
+      if (ruleTag[rn] === k) delete ruleTag[rn]; else ruleTag[rn] = k;
+      saveRuleTag();
+      // aggiorna SOLO la card interessata, senza ricostruire la schermata (niente salto di scroll)
+      var cardEl3 = el.closest('.card');
+      if (cardEl3) {
+        var newTag = ruleTag[rn];
+        cardEl3.querySelectorAll('.tagbtn').forEach(function (btn) {
+          var bk = btn.getAttribute('data-arg').split(':')[1], on = newTag === bk;
+          btn.classList.toggle('on', on);
+          btn.style.background = on ? RULE_TAGS[bk].color : '';
+          btn.style.color = on ? '#fff' : '';
+        });
+        var headEl = cardEl3.querySelector('.head');
+        var oldDot = headEl.querySelector('.tagdot');
+        if (oldDot) oldDot.remove();
+        if (newTag) {
+          var dotEl = document.createElement('span');
+          dotEl.className = 'tagdot';
+          dotEl.style.background = RULE_TAGS[newTag].color;
+          dotEl.title = RULE_TAGS[newTag].label;
+          headEl.insertBefore(dotEl, headEl.querySelector('.iconbtn.fav'));
+        }
+      }
+      e.stopPropagation();
+    }
     else if (act === 'fav') { if (fav.has(arg)) fav.delete(arg); else fav.add(arg); saveFav(); render(); e.stopPropagation(); }
     else if (act === 'speak') { speak(arg); e.stopPropagation(); }
     else if (act === 'reveal') { revealed = true; render(); }
