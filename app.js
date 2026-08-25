@@ -43,7 +43,16 @@
     voiceReady = true;
     try { var w = new SpeechSynthesisUtterance(' '); w.volume = 0; speechSynthesis.speak(w); } catch (e) {}
   }, { once: false, passive: true });
-  function keyOf(en) { return en.toLowerCase().replace(/^(to be |to have |to |a |an |the )/, ''); }
+  function keyOf(en) {
+    var s = en.toLowerCase(), prev;
+    do { prev = s; s = s.replace(/^(to be |to have |to |your |my |his |her |their |our |a |an |the )/, ''); } while (s !== prev);
+    return s;
+  }
+  // Ordina sempre alfabeticamente (indipendentemente dall'ordine in cui sono state scritte nel file sorgente)
+  function sortByKey(arr, getEn) { arr.sort(function (a, b) { var ka = keyOf(getEn(a)), kb = keyOf(getEn(b)); return ka < kb ? -1 : ka > kb ? 1 : 0; }); }
+  if (D.vocab) sortByKey(D.vocab, function (x) { return x.en; });
+  if (D.idiomi) sortByKey(D.idiomi, function (x) { return x.en; });
+  if (D.phrasal) sortByKey(D.phrasal, function (x) { return x.pv; });
 
   /* ---------- icons (SVG puliti) ---------- */
   var IC = {
@@ -343,7 +352,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v27</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v28</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
