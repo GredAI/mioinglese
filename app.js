@@ -8,7 +8,7 @@
   function save(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
   var fav = new Set(load('fav', []));
   var review = new Set(load('review', []));
-  var recent = load('recent', []);
+  var recent = load('recent', []); if (recent.length > 3) { recent = recent.slice(0, 3); save('recent', recent); }
   function saveFav() { save('fav', Array.from(fav)); }
   function saveReview() { save('review', Array.from(review)); }
   function saveRecent() { save('recent', recent); }
@@ -85,7 +85,7 @@
   function speakBtn(text) { return '<button class="iconbtn" data-act="speak" data-arg="' + esc(text) + '" aria-label="Ascolta">' + IC.speaker + '</button>'; }
   function pushRecent(item) {
     recent = recent.filter(function (r) { return r.id !== item.id; });
-    recent.unshift(item); if (recent.length > 6) recent = recent.slice(0, 6); saveRecent();
+    recent.unshift(item); if (recent.length > 3) recent = recent.slice(0, 3); saveRecent();
   }
 
   /* ---------- rendering pieces ---------- */
@@ -352,7 +352,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v28</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v29</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
