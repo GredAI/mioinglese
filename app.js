@@ -62,6 +62,7 @@
   if (D.vocab) sortByKey(D.vocab, function (x) { return x.en; });
   if (D.idiomi) sortByKey(D.idiomi, function (x) { return x.en; });
   if (D.phrasal) sortByKey(D.phrasal, function (x) { return x.pv; });
+  if (D.irregolari) sortByKey(D.irregolari, function (x) { return x.en; });
 
   /* ---------- icons (SVG puliti) ---------- */
   var IC = {
@@ -129,6 +130,13 @@
       '<span class="it">' + esc(d.it) + '</span></div>' + (d.extra ? '<div class="exq">' + esc(d.extra) + '</div>' : '') + '</div>' +
       favBtn('i' + i) + '</div>';
   }
+  function verbRow(d, i) {
+    return '<div class="row">' + speakBtn(d.en.replace(/\s*\(.*?\)/g, '')) +
+      '<div class="main"><div class="line"><span class="en">' + esc(d.en) + '</span>' +
+      '<span class="it">' + esc(d.it) + '</span></div>' +
+      '<div class="exq">' + esc(d.past) + '  →  ' + esc(d.pp) + '</div></div>' +
+      favBtn('irr' + i) + '</div>';
+  }
   function alphaList(arr, rowFn) {
     var out = '', letter = '';
     arr.forEach(function (x) {
@@ -146,6 +154,7 @@
     if (route.name === 'vocab') return listScreen('Vocabolario', 'Cerca una parola…', vocabBody);
     if (route.name === 'frasi') return listScreen('Modi di dire', 'Cerca un modo di dire…', frasiBody);
     if (route.name === 'phrasal') return listScreen('Phrasal verbs', 'Cerca un phrasal verb…', phrasalBody, true);
+    if (route.name === 'irregolari') return listScreen('Verbi irregolari', 'Cerca un verbo…', irregolariBody, true);
     if (route.name === 'flashcard') return flashScreen();
     if (route.name === 'canzoni') return listScreen('Canzoni', 'Cerca…', canzoniBody, true);
     if (route.name === 'racconti') return raccontiScreen();
@@ -215,6 +224,13 @@
       '<span class="it">' + esc(d.it) + '</span></div>' +
       '<div class="exq">(= ' + esc(d.eq) + ') · ' + esc(d.sep) + '</div>' +
       (d.ex ? '<div class="exq">' + esc(d.ex) + '</div>' : '') + '</div>' + favBtn('p' + i) + '</div>';
+  }
+  function irregolariBody(term) {
+    var t = term.toLowerCase();
+    var arr = (D.irregolari || []).map(function (d, i) { return { d: d, i: i }; })
+      .filter(function (x) { return !t || (x.d.en + ' ' + x.d.it + ' ' + x.d.past + ' ' + x.d.pp).toLowerCase().indexOf(t) >= 0; });
+    var note = '<div class="schemenote" style="margin:0 4px 10px">Nota: <b>be</b> è irregolare anche al presente (I am · you/we/they are · he/she/it is), was/were al passato. <b>Read</b> si scrive uguale in tutte e tre le forme, ma al passato e al participio si pronuncia come "red".</div>';
+    return note + alphaList(arr, verbRow);
   }
   function phrasalBody(term) {
     var t = term.toLowerCase();
@@ -376,7 +392,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v30</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v31</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -394,6 +410,7 @@
       tile('vocab', '🔤', 'Vocabolario', D.vocab.length + ' parole') +
       tile('frasi', '💬', 'Modi di dire', D.idiomi.length + ' frasi') +
       tile('phrasal', '🔗', 'Phrasal verbs', (D.phrasal ? D.phrasal.length : 0) + ' verbi') +
+      tile('irregolari', '🔁', 'Verbi irregolari', (D.irregolari ? D.irregolari.length : 0) + ' verbi') +
       tile('flashcard', '🃏', 'Flashcard', 'Ripassa') +
       tile('componi', '✍️', 'Frase del giorno', 'Esercitati') +
       tile('canzoni', '🎵', 'Canzoni', D.canzoni.length + ' brani') +
@@ -415,6 +432,8 @@
     if (ii.length) out += '<div class="hgroup">Modi di dire (' + ii.length + ')</div>' + ii.map(function (x) { return idiRow(x.d, x.i); }).join('');
     var pp = (D.phrasal || []).map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.pv + ' ' + x.d.it + ' ' + x.d.eq).toLowerCase().indexOf(t) >= 0; });
     if (pp.length) out += '<div class="hgroup">Phrasal verbs (' + pp.length + ')</div>' + pp.map(function (x) { return phrRow(x.d, x.i); }).join('');
+    var ww = (D.irregolari || []).map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.en + ' ' + x.d.it + ' ' + x.d.past + ' ' + x.d.pp).toLowerCase().indexOf(t) >= 0; });
+    if (ww.length) out += '<div class="hgroup">Verbi irregolari (' + ww.length + ')</div>' + ww.map(function (x) { return verbRow(x.d, x.i); }).join('');
     var cc = D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' ').toLowerCase().indexOf(t) >= 0; });
     if (cc.length) out += '<div class="hgroup">Racconti (' + cc.length + ')</div>' + cc.map(function (x) { var m = x.s.title.match(/^(.*?)\s*\(/); return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(m ? m[1].trim() : x.s.title) + '</span><span class="chev">›</span></div></div>'; }).join('');
     return out || '<div class="empty">Nessun risultato per “' + esc(t) + '”.</div>';
@@ -431,6 +450,8 @@
     if (ii.length) out += '<div class="hgroup">Modi di dire</div>' + ii.join('');
     var pp = []; (D.phrasal || []).forEach(function (d, i) { if (fav.has('p' + i)) pp.push(phrRow(d, i)); });
     if (pp.length) out += '<div class="hgroup">Phrasal verbs</div>' + pp.join('');
+    var ww = []; (D.irregolari || []).forEach(function (d, i) { if (fav.has('irr' + i)) ww.push(verbRow(d, i)); });
+    if (ww.length) out += '<div class="hgroup">Verbi irregolari</div>' + ww.join('');
     if (!out) out = '<div class="empty">Nessun preferito ancora.<br>Tocca il cuore accanto a una regola o parola per salvarla qui.</div>';
     return topBar('Preferiti', 'home') + '<main class="fade">' + out + '</main>';
   }
@@ -519,6 +540,7 @@
     else if (route.name === 'vocab') b.innerHTML = vocabBody(term);
     else if (route.name === 'frasi') b.innerHTML = frasiBody(term);
     else if (route.name === 'phrasal') b.innerHTML = phrasalBody(term);
+    else if (route.name === 'irregolari') b.innerHTML = irregolariBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
   });
 
