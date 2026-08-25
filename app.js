@@ -380,6 +380,15 @@
     if (/\bmuch\s+(cars|people|friends|books|things|dogs|cats|children|apples|words|days|years|houses)\b/.test(s)) h.push('Con i numerabili plurali si usa “many”, non “much”.');
     if (/\b(he|she|it)\s+don't\b/.test(s)) h.push('Terza persona: doesn’t (non “don’t”): he/she/it doesn’t.');
     if (/\bi'm keen\b[^.]*\bto\b/.test(s) && !/keen to /.test(s)) { /* già coperto sopra */ }
+    // --- controlli aggiunti dal Promemoria (i tuoi errori ricorrenti) ---
+    var ADJ_AFTER_DO = 'happy|sad|ready|hungry|tired|confident|sure|afraid|angry|nervous|okay|fine|well|late|early|busy|free|available|worried|excited|bored|scared|proud|ashamed|jealous|lonely|calm|comfortable';
+    if (new RegExp('\\b(doesn\'t|don\'t)\\s+(very\\s+)?(' + ADJ_AFTER_DO + ')\\b').test(s)) h.push('Con un aggettivo dopo, serve il verbo essere (isn’t/aren’t), non doesn’t/don’t: she isn’t happy, non she doesn’t happy.');
+    if (/\bwhen\s+(only\s+)?\w+\s+(minutes?|hours?|days?|weeks?|seconds?)\s+left\b/.test(s)) h.push('“When” vuole soggetto + verbo (when only five minutes are left); per ambientare una situazione senza verbo usa “with” (with only five minutes left).');
+    if (/\bconfident\s+to\s+[a-z]+/.test(s)) h.push('Dopo “confident” si usa about/in + -ing (confident about speaking), non “confident to” + verbo.');
+    var VERB_S = 'speaks|goes|does|says|comes|gives|takes|makes|sees|knows|wants|needs|tries|helps|thinks|works|starts|stops|decides|leaves|writes|reads|plays|watches|listens|studies|stays|talks|walks|runs|sits|eats|drinks';
+    if (new RegExp('\\blet\\s+(him|her|them|someone|somebody|me|us)\\s+(else\\s+)?(' + VERB_S + ')\\b').test(s)) h.push('Dopo “let” + persona il verbo va alla forma base, senza -s: let her speak, non let her speaks.');
+    if (/\b(listen to|watch|hear)\s+(him|her|them|someone|somebody|me|us|it)\s+to\s+[a-z]+/.test(s)) h.push('Dopo i verbi di percezione (listen to, watch, hear) + persona, il verbo va alla forma base, senza “to”: listen to her talk, non listen to her to talk.');
+    if (/\bso that\b(\s+\w+){0,2}\s+to\s+[a-z]+/.test(s)) h.push('Per un risultato non voluto/ironico (“per poi…”) usa “only to” + infinito, non “so that” (che indica uno scopo voluto): I study, only to forget everything.');
     return h;
   }
   function composedScreen() {
@@ -392,7 +401,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v31</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v32</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
