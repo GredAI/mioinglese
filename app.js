@@ -417,6 +417,10 @@
       var alt = '(' + verbForms(verb).join('|') + ')' + (rest ? '\\s+' + rest : '');
       if (new RegExp('\\b' + alt + '\\s+to\\b').test(s)) h.push('“' + d.pv + '” è già completo così: non serve “to” dopo (' + d.it.split(/[,·]/)[0].trim() + ').');
     });
+    // --- controlli aggiunti dallo schema "avere freddo/fame/paura… → to be, non to have" ---
+    if (/\b(i|you|we|they)\s+have\s+(cold|hot)\b(?!\s+\w)/.test(s) || /\b(he|she|it)\s+has\s+(cold|hot)\b(?!\s+\w)/.test(s)) h.push('“Avere freddo/caldo” si dice con to be, non to have: I’m cold / I’m hot, non I have cold/hot.');
+    if (/\bhave\s+(hungry|thirsty|afraid|sleepy)\b/.test(s) || /\bhas\s+(hungry|thirsty|afraid|sleepy)\b/.test(s)) h.push('“Avere fame/sete/paura/sonno” si dice con to be, non to have: I’m hungry, non I have hungry.');
+    if (/\b(i|you|we|they)\s+have\s+\d+\s+years?\b/.test(s) || /\b(he|she|it)\s+has\s+\d+\s+years?\b/.test(s)) h.push('Per l’età si usa to be + numero, non to have: I’m 30 (years old), non I have 30 years.');
     return h;
   }
   function composedScreen() {
@@ -429,7 +433,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v33</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v37</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
