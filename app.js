@@ -278,8 +278,9 @@
   }
 
   /* ---------- schemi (tabelle di riferimento rapido) ---------- */
+  var openSchemi = new Set();
   function schemiScreen() {
-    var list = (D.schemi || []).map(function (s) {
+    var list = (D.schemi || []).map(function (s, i) {
       var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
       var rows = s.rows.map(function (r) {
         return '<tr>' + r.map(function (c) {
@@ -288,11 +289,12 @@
           return '<td>' + esc(parts[0]) + ex + '</td>';
         }).join('') + '</tr>';
       }).join('');
-      return '<div class="schemecard">' +
-        '<div class="schemetitle">' + esc(s.title) + '</div>' +
-        '<div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
+      var open = openSchemi.has(i);
+      return '<div class="schemecard' + (open ? ' open' : '') + '" data-schema="' + i + '">' +
+        '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
+        '<div class="sbody"><div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
         (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') +
-        '</div>';
+        '</div></div>';
     }).join('') || '<div class="empty">Nessuno schema ancora.</div>';
     return topBar('Schemi', 'home') + '<main class="fade">' + list + '</main>';
   }
@@ -433,7 +435,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v38</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v43</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -518,6 +520,12 @@
         var r = D.rules.find(function (x) { return x.n === n; });
         if (r) pushRecent({ id: 'rule:' + n, label: 'Regola ' + n + ': ' + r.title });
       }
+    }
+    else if (act === 'schema') {
+      // apri/chiudi la card dello schema SUL POSTO, senza ricostruire la schermata
+      var si = +arg, schemaEl = el.closest('.schemecard');
+      if (openSchemi.has(si)) { openSchemi.delete(si); if (schemaEl) schemaEl.classList.remove('open'); }
+      else { openSchemi.add(si); if (schemaEl) schemaEl.classList.add('open'); }
     }
     else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regtag') { regTag = arg; var qc3 = document.getElementById('q'); var bc3 = document.getElementById('body'); if (bc3) bc3.innerHTML = regoleBody(qc3 ? qc3.value : ''); window.scrollTo(0, 0); }
