@@ -279,11 +279,14 @@
 
   /* ---------- schemi (tabelle di riferimento rapido) ---------- */
   var openSchemi = new Set();
+  var schemaHi = new Set(load('schemaHi', []));
+  function saveSchemaHi() { save('schemaHi', Array.from(schemaHi)); }
   function schemiScreen() {
     var list = (D.schemi || []).map(function (s, i) {
       var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
-      var rows = s.rows.map(function (r) {
-        return '<tr>' + r.map(function (c) {
+      var rows = s.rows.map(function (r, ri) {
+        var key = i + ':' + ri, hi = schemaHi.has(key);
+        return '<tr class="' + (hi ? 'hi' : '') + '" data-act="schemarow" data-arg="' + key + '">' + r.map(function (c) {
           var parts = String(c).split('\n');
           var ex = parts.length > 1 ? '<div class="cex">' + esc(parts.slice(1).join(' ')) + '</div>' : '';
           return '<td>' + esc(parts[0]) + ex + '</td>';
@@ -435,7 +438,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v44</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v50</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -526,6 +529,12 @@
       var si = +arg, schemaEl = el.closest('.schemecard');
       if (openSchemi.has(si)) { openSchemi.delete(si); if (schemaEl) schemaEl.classList.remove('open'); }
       else { openSchemi.add(si); if (schemaEl) schemaEl.classList.add('open'); }
+    }
+    else if (act === 'schemarow') {
+      // evidenzia/rimuovi evidenziazione dalla riga SUL POSTO, senza ricostruire la schermata
+      if (schemaHi.has(arg)) schemaHi.delete(arg); else schemaHi.add(arg);
+      saveSchemaHi();
+      if (el.tagName === 'TR') el.classList.toggle('hi');
     }
     else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regtag') { regTag = arg; var qc3 = document.getElementById('q'); var bc3 = document.getElementById('body'); if (bc3) bc3.innerHTML = regoleBody(qc3 ? qc3.value : ''); window.scrollTo(0, 0); }

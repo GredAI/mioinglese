@@ -97,6 +97,8 @@ table.scheme{border-collapse:collapse;width:100%;font-size:15px;table-layout:fix
 table.scheme th{background:var(--accent);color:#fff;font-weight:600;padding:8px 5px;text-align:center;font-size:12px;line-height:1.2;overflow-wrap:break-word;}
 table.scheme td{padding:9px 5px;text-align:center;border-top:1px solid var(--line);line-height:1.3;overflow-wrap:break-word;}
 table.scheme tbody tr:nth-child(even){background:#f7f8fa;}
+table.scheme tbody tr{cursor:pointer;}
+table.scheme tbody tr.hi,table.scheme tbody tr.hi:nth-child(even){background:#fff1a8;}
 table.scheme td .cex{font-size:12px;color:var(--muted);font-style:italic;margin-top:3px;}
 .schemenote{font-size:13px;color:var(--muted);font-style:italic;margin:10px 2px 0;}
 
