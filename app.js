@@ -159,6 +159,7 @@
     if (route.name === 'canzoni') return listScreen('Canzoni', 'Cerca…', canzoniBody, true);
     if (route.name === 'racconti') return raccontiScreen();
     if (route.name === 'schemi') return schemiScreen();
+    if (route.name === 'tempi') return tempiScreen();
     if (route.name === 'racc') return raccDetail(route.arg);
     if (route.name === 'preferiti') return preferitiScreen();
     if (route.name === 'componi') return componiScreen();
@@ -302,6 +303,27 @@
     return topBar('Schemi', 'home') + '<main class="fade">' + list + '</main>';
   }
 
+  /* ---------- tempi verbali (schema di costruzione, attivo/passivo) ---------- */
+  var openTempi = new Set();
+  function tempoBlock(label, costr, en, it) {
+    if (!en) return '';
+    return '<div class="tempoblock"><div class="tempolabel">' + label + '</div>' +
+      (costr ? '<div class="schemenote" style="margin:2px 0 6px">' + esc(costr) + '</div>' : '') +
+      '<div class="tempoex"><span class="en">' + esc(en) + '</span><span class="it">' + esc(it) + '</span></div></div>';
+  }
+  function tempiScreen() {
+    var list = (D.tempi || []).map(function (t, i) {
+      var open = openTempi.has(i);
+      var body = tempoBlock('Attivo', t.costrAttiva, t.attivoEn, t.attivoIt) +
+        (t.passivoEn ? tempoBlock('Passivo', t.costrPassiva, t.passivoEn, t.passivoIt) :
+          '<div class="tempoblock"><div class="tempolabel">Passivo</div><div class="schemenote" style="margin:2px 0 0">' + esc(t.notaPassiva || 'Forma passiva non comune per questo tempo.') + '</div></div>');
+      return '<div class="schemecard' + (open ? ' open' : '') + '" data-tempo="' + i + '">' +
+        '<div class="shead" data-act="tempo" data-arg="' + i + '"><span class="schemetitle">' + esc(t.tense) + '</span><span class="chev">›</span></div>' +
+        '<div class="sbody">' + body + '</div></div>';
+    }).join('') || '<div class="empty">Nessun tempo verbale ancora.</div>';
+    return topBar('Tempi verbali', 'home') + '<main class="fade">' + list + '</main>';
+  }
+
   /* ---------- flashcard ---------- */
   var card = null, revealed = false;
   // mazzo flashcard = TUTTO ciò che hai incontrato: vocaboli + modi di dire + espressioni delle canzoni
@@ -438,7 +460,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v53</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v54</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -453,6 +475,7 @@
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
+      tile('tempi', '⏳', 'Tempi verbali', (D.tempi ? D.tempi.length : 0) + ' tempi, attivo e passivo') +
       tile('vocab', '🔤', 'Vocabolario', D.vocab.length + ' parole') +
       tile('frasi', '💬', 'Modi di dire', D.idiomi.length + ' frasi') +
       tile('phrasal', '🔗', 'Phrasal verbs', (D.phrasal ? D.phrasal.length : 0) + ' verbi') +
@@ -529,6 +552,12 @@
       var si = +arg, schemaEl = el.closest('.schemecard');
       if (openSchemi.has(si)) { openSchemi.delete(si); if (schemaEl) schemaEl.classList.remove('open'); }
       else { openSchemi.add(si); if (schemaEl) schemaEl.classList.add('open'); }
+    }
+    else if (act === 'tempo') {
+      // apri/chiudi la card del tempo verbale SUL POSTO, senza ricostruire la schermata
+      var ti = +arg, tempoEl = el.closest('.schemecard');
+      if (openTempi.has(ti)) { openTempi.delete(ti); if (tempoEl) tempoEl.classList.remove('open'); }
+      else { openTempi.add(ti); if (tempoEl) tempoEl.classList.add('open'); }
     }
     else if (act === 'schemarow') {
       // evidenzia/rimuovi evidenziazione dalla riga SUL POSTO, senza ricostruire la schermata
