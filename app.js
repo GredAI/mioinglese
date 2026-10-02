@@ -314,7 +314,8 @@
   function tempiScreen() {
     var list = (D.tempi || []).map(function (t, i) {
       var open = openTempi.has(i);
-      var body = tempoBlock('Attivo', t.costrAttiva, t.attivoEn, t.attivoIt) +
+      var body = (t.quando ? '<div class="schemenote" style="margin:0 2px 12px">' + esc(t.quando) + '</div>' : '') +
+        tempoBlock('Attivo', t.costrAttiva, t.attivoEn, t.attivoIt) +
         (t.passivoEn ? tempoBlock('Passivo', t.costrPassiva, t.passivoEn, t.passivoIt) :
           '<div class="tempoblock"><div class="tempolabel">Passivo</div><div class="schemenote" style="margin:2px 0 0">' + esc(t.notaPassiva || 'Forma passiva non comune per questo tempo.') + '</div></div>');
       return '<div class="schemecard' + (open ? ' open' : '') + '" data-tempo="' + i + '">' +
@@ -460,7 +461,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v54</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v55</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
