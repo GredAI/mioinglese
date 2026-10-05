@@ -325,7 +325,9 @@
       var open = openTempi.has(i);
       var body = (t.quando ? '<div class="schemenote" style="margin:0 2px 12px">' + esc(t.quando) + '</div>' : '') +
         tempoBlock('Attivo', t.costrAttiva, t.attivoEn, t.attivoIt) +
-        (t.passivoEn ? tempoBlock('Passivo', t.costrPassiva, t.passivoEn, t.passivoIt) :
+        tempoBlock('Attivo — negativo', t.costrNegAtt, t.negAttEn, t.negAttIt) +
+        (t.passivoEn ? tempoBlock('Passivo', t.costrPassiva, t.passivoEn, t.passivoIt) +
+          tempoBlock('Passivo — negativo', t.costrNegPas, t.negPasEn, t.negPasIt) :
           '<div class="tempoblock"><div class="tempolabel">Passivo</div><div class="schemenote" style="margin:2px 0 0">' + esc(t.notaPassiva || 'Forma passiva non comune per questo tempo.') + '</div></div>');
       return '<div class="schemecard' + (open ? ' open' : '') + '" data-tempo="' + i + '">' +
         '<div class="shead" data-act="tempo" data-arg="' + i + '"><span class="schemetitle">' + esc(t.tense) + '</span><span class="chev">›</span></div>' +
@@ -470,7 +472,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v60</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v61</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
