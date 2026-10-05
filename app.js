@@ -282,10 +282,15 @@
   var openSchemi = new Set();
   var schemaHi = new Set(load('schemaHi', []));
   function saveSchemaHi() { save('schemaHi', Array.from(schemaHi)); }
-  function schemiScreen() {
+  function schemiBody(term) {
+    var t = (term || '').toLowerCase().trim();
     var list = (D.schemi || []).map(function (s, i) {
+      var titleHit = t && s.title.toLowerCase().indexOf(t) >= 0;
       var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
+      var shown = 0;
       var rows = s.rows.map(function (r, ri) {
+        if (t && !titleHit && r.join(' ').toLowerCase().indexOf(t) < 0) return '';
+        shown++;
         var key = i + ':' + ri, hi = schemaHi.has(key);
         return '<tr class="' + (hi ? 'hi' : '') + '" data-act="schemarow" data-arg="' + key + '">' + r.map(function (c) {
           var parts = String(c).split('\n');
@@ -293,14 +298,18 @@
           return '<td>' + esc(parts[0]) + ex + '</td>';
         }).join('') + '</tr>';
       }).join('');
-      var open = openSchemi.has(i);
+      if (t && !shown && !(s.note && s.note.toLowerCase().indexOf(t) >= 0)) return '';
+      var open = t ? true : openSchemi.has(i); // durante la ricerca le card trovate si aprono da sole
       return '<div class="schemecard' + (open ? ' open' : '') + '" data-schema="' + i + '">' +
         '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
         '<div class="sbody"><div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
         (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') +
         '</div></div>';
-    }).join('') || '<div class="empty">Nessuno schema ancora.</div>';
-    return topBar('Schemi', 'home') + '<main class="fade">' + list + '</main>';
+    }).join('');
+    return list || '<div class="empty">' + (t ? 'Nessun risultato.' : 'Nessuno schema ancora.') + '</div>';
+  }
+  function schemiScreen() {
+    return listScreen('Schemi', 'Cerca una frase o un argomento…', schemiBody, true);
   }
 
   /* ---------- tempi verbali (schema di costruzione, attivo/passivo) ---------- */
@@ -461,7 +470,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v59</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v60</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -629,6 +638,7 @@
     else if (route.name === 'frasi') b.innerHTML = frasiBody(term);
     else if (route.name === 'phrasal') b.innerHTML = phrasalBody(term);
     else if (route.name === 'irregolari') b.innerHTML = irregolariBody(term);
+    else if (route.name === 'schemi') b.innerHTML = schemiBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
   });
 
