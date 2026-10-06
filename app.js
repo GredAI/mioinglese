@@ -472,7 +472,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v62</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v65</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -642,7 +642,25 @@
     else if (route.name === 'irregolari') b.innerHTML = irregolariBody(term);
     else if (route.name === 'schemi') b.innerHTML = schemiBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
+    highlight(b, term);
   });
+  /* evidenzia il termine cercato nei risultati */
+  function highlight(root, term) {
+    term = (term || '').trim().toLowerCase();
+    if (term.length < 2) return;
+    var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false), nodes = [], n;
+    while ((n = walker.nextNode())) { if (n.nodeValue.toLowerCase().indexOf(term) >= 0) nodes.push(n); }
+    nodes.forEach(function (node) {
+      var txt = node.nodeValue, low = txt.toLowerCase(), i = 0, p, frag = document.createDocumentFragment();
+      while ((p = low.indexOf(term, i)) >= 0) {
+        if (p > i) frag.appendChild(document.createTextNode(txt.slice(i, p)));
+        var m = document.createElement('mark'); m.textContent = txt.slice(p, p + term.length); frag.appendChild(m);
+        i = p + term.length;
+      }
+      if (i < txt.length) frag.appendChild(document.createTextNode(txt.slice(i)));
+      node.parentNode.replaceChild(frag, node);
+    });
+  }
 
   /* ---------- service worker ---------- */
   if ('serviceWorker' in navigator) { navigator.serviceWorker.register('sw.js').catch(function () {}); }
