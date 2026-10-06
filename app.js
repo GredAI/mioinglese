@@ -472,7 +472,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v65</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v66</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -643,6 +643,10 @@
     else if (route.name === 'schemi') b.innerHTML = schemiBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
     highlight(b, term);
+    if (term.trim() && b.querySelector('.empty')) {
+      var q = 'Come si dice in inglese (o cosa significa): ' + term.trim() + '? Rispondi in modo breve, con un esempio.';
+      b.insertAdjacentHTML('beforeend', '<a class="askclaude" href="https://claude.ai/new?q=' + encodeURIComponent(q) + '" target="_blank" rel="noopener">✨ Chiedi a Claude: “' + esc(term.trim()) + '”</a>');
+    }
   });
   /* evidenzia il termine cercato nei risultati */
   function highlight(root, term) {
