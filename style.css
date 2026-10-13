@@ -217,3 +217,10 @@ mark.pos{background:#ffe066;color:#1c1c1e;font-weight:700;border-radius:4px;padd
 .vcell.g0{background:#e6f0fd;color:#0b3d7a;}
 .vcell.g1{background:#eeeafd;color:#3a2a8a;}
 .vnote{font-size:13px;color:var(--muted);margin-top:8px;line-height:1.4;}
+
+.vflow{padding:11px 14px;border-radius:14px;margin:8px 0;}
+.vq{font-size:14px;line-height:1.35;}
+.va{font-size:19px;font-weight:700;margin:3px 0;}
+.vex{font-size:13px;font-style:italic;opacity:.9;}
+.c-p{background:#efe8fb;color:#4a2a8a;}
+.c-y{background:#fff5cc;color:#6b5200;}
