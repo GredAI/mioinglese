@@ -289,11 +289,11 @@
       var body = '';
       if (b.type === 'rows') {
         body = b.rows.map(function (r) {
-          return '<div class="vrow c-' + (r.c || 'g') + '"><span class="vl">' + esc(r.label) + '</span><span class="vk">' + esc(r.key) + '</span><span class="vx">' + esc(r.ex || '') + '</span></div>';
+          return '<div class="vrow c-' + (r.c || 'g') + '"><span class="vl">' + esc(r.label) + '</span><span class="vk">' + esc(r.key) + '</span><span class="vx">' + esc(r.ex || '') + (r.it ? '<br><i>' + esc(r.it) + '</i>' : '') + '</span></div>';
         }).join('');
       } else if (b.type === 'flow') {
         body = b.rows.map(function (r) {
-          return '<div class="vflow c-' + (r.c || 'b') + '"><div class="vq">' + esc(r.q) + '</div><div class="va">→ ' + esc(r.a) + '</div>' + (r.ex ? '<div class="vex">' + esc(r.ex) + '</div>' : '') + '</div>';
+          return '<div class="vflow c-' + (r.c || 'b') + '"><div class="vq">' + esc(r.q) + '</div><div class="va">→ ' + esc(r.a) + '</div>' + (r.ex ? '<div class="vex">' + esc(r.ex) + '</div>' : '') + (r.it ? '<div class="vit">' + esc(r.it) + '</div>' : '') + '</div>';
         }).join('');
       } else if (b.type === 'grid') {
         body = '<div class="vgrid" style="grid-template-columns:minmax(0,.8fr) repeat(' + b.cols.length + ',1fr)"><div></div>' +
@@ -503,7 +503,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v76</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v77</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
