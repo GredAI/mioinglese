@@ -24,7 +24,8 @@
 
   /* ---------- helpers ---------- */
   function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  function bold(s) { return esc(s).split('**').map(function (x, i) { return i % 2 ? '<strong>' + x + '</strong>' : x; }).join(''); }
+  function posm(s) { return s.replace(/\[\[(.+?)\]\]/g, '<mark class="pos">$1</mark>'); }
+  function bold(s) { return posm(esc(s).split('**').map(function (x, i) { return i % 2 ? '<strong>' + x + '</strong>' : x; }).join('')); }
   function markedHtml(t) {
     var s = esc(t).split('//').join('').split('/').join('');
     s = s.replace(/\*\*(.+?)\*\*/g, '<b class="st">$1</b>');
@@ -100,14 +101,14 @@
 
   /* ---------- rendering pieces ---------- */
   function ruleCard(r, open) {
-    var desc = (r.items[0] && r.items[0].s ? r.items[0].s.replace(/\*\*/g, '') : '');
+    var desc = (r.items[0] && r.items[0].s ? r.items[0].s.replace(/\*\*|\[\[|\]\]/g, '') : '');
     var chars = r.items.map(function (i) { return i.s || ''; }).join(' ').length;
     var lunga = chars > 500 ? '<span class="lunga">LUNGA</span>' : '';
     var tag = ruleTag[r.n];
     var dot = tag ? '<span class="tagdot" style="background:' + RULE_TAGS[tag].color + '" title="' + esc(RULE_TAGS[tag].label) + '"></span>' : '';
     var body = r.items.map(function (it) {
       if (it.t === 'exp') return '<p class="exp">' + bold(it.s) + '</p>';
-      return '<div class="exline ' + it.t + '"><b>' + (it.t === 'wrong' ? '✗' : '✓') + '</b>' + esc(it.s) + '</div>';
+      return '<div class="exline ' + it.t + '"><b>' + (it.t === 'wrong' ? '✗' : '✓') + '</b><span>' + posm(esc(it.s)) + '</span></div>';
     }).join('');
     var tagbar = '<div class="tagbar">' + RULE_TAG_ORDER.map(function (k) {
       var on = tag === k, tg = RULE_TAGS[k];
@@ -282,9 +283,35 @@
   var openSchemi = new Set();
   var schemaHi = new Set(load('schemaHi', []));
   function saveSchemaHi() { save('schemaHi', Array.from(schemaHi)); }
+  function blocksHtml(blocks) {
+    return blocks.map(function (b) {
+      var h = (b.h ? '<div class="vbh">' + esc(b.h) + '</div>' : '') + (b.sub ? '<div class="vbs">' + esc(b.sub) + '</div>' : '');
+      var body = '';
+      if (b.type === 'rows') {
+        body = b.rows.map(function (r) {
+          return '<div class="vrow c-' + (r.c || 'g') + '"><span class="vl">' + esc(r.label) + '</span><span class="vk">' + esc(r.key) + '</span><span class="vx">' + esc(r.ex || '') + '</span></div>';
+        }).join('');
+      } else if (b.type === 'grid') {
+        body = '<div class="vgrid" style="grid-template-columns:minmax(0,.8fr) repeat(' + b.cols.length + ',1fr)"><div></div>' +
+          b.cols.map(function (c, ci) { return '<div class="vcell vhead g' + ci + '"><b>' + esc(c.t) + '</b><small>' + esc(c.s || '') + '</small></div>'; }).join('') +
+          b.rows.map(function (r) {
+            return '<div class="vlab">' + esc(r.label) + '</div>' + r.cells.map(function (c, ci) { return '<div class="vcell g' + ci + '"><b>' + esc(c.t) + '</b><small>' + esc(c.s || '') + '</small></div>'; }).join('');
+          }).join('') + '</div>';
+      }
+      return '<div class="vblock">' + h + body + (b.note ? '<div class="vnote">' + esc(b.note) + '</div>' : '') + '</div>';
+    }).join('');
+  }
+  function blocksText(blocks) { return JSON.stringify(blocks).replace(/[{}\[\]":,]|\b(type|rows|cols|cells|label|key|ex|sub|note|h|t|s|c)\b/g, ' ').toLowerCase(); }
   function schemiBody(term) {
     var t = (term || '').toLowerCase().trim();
     var list = (D.schemi || []).map(function (s, i) {
+      if (s.blocks) {
+        if (t && s.title.toLowerCase().indexOf(t) < 0 && blocksText(s.blocks).indexOf(t) < 0) return '';
+        var op = t ? true : openSchemi.has(i);
+        return '<div class="schemecard' + (op ? ' open' : '') + '" data-schema="' + i + '">' +
+          '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
+          '<div class="sbody"><div class="vwrap">' + blocksHtml(s.blocks) + '</div>' + (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + '</div></div>';
+      }
       var titleHit = t && s.title.toLowerCase().indexOf(t) >= 0;
       var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
       var shown = 0;
@@ -472,7 +499,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v68</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v73</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
