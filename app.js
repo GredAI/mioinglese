@@ -503,7 +503,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v78</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v80</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -548,6 +548,12 @@
     if (ww.length) out += '<div class="hgroup">Verbi irregolari (' + ww.length + ')</div>' + ww.map(function (x) { return verbRow(x.d, x.i); }).join('');
     var cc = D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' ').toLowerCase().indexOf(t) >= 0; });
     if (cc.length) out += '<div class="hgroup">Racconti (' + cc.length + ')</div>' + cc.map(function (x) { var m = x.s.title.match(/^(.*?)\s*\(/); return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(m ? m[1].trim() : x.s.title) + '</span><span class="chev">›</span></div></div>'; }).join('');
+    var sb = schemiBody(t);
+    if (sb.indexOf('class="empty"') < 0) out += '<div class="hgroup">Schemi (' + (sb.match(/class="schemecard/g) || []).length + ')</div>' + sb;
+    var tm = (D.tempi || []).filter(function (x) { return JSON.stringify(x).toLowerCase().indexOf(t) >= 0; });
+    if (tm.length) out += '<div class="hgroup">Tempi verbali (' + tm.length + ')</div><div class="card" data-act="go" data-arg="tempi"><div class="head"><span class="ctitle">' + esc(tm.map(function (x) { return x.tense; }).join(' · ')) + '<span class="cdesc">Apri la sezione Tempi verbali</span></span><span class="chev">›</span></div></div>';
+    var cz = (D.canzoni || []).filter(function (x) { return JSON.stringify(x).toLowerCase().indexOf(t) >= 0; });
+    if (cz.length) out += '<div class="hgroup">Canzoni (' + cz.length + ')</div><div class="card" data-act="go" data-arg="canzoni"><div class="head"><span class="ctitle">' + esc(cz.map(function (x) { return x.song; }).join(' · ')) + '<span class="cdesc">Apri la sezione Canzoni</span></span><span class="chev">›</span></div></div>';
     return out || '<div class="empty">Nessun risultato per “' + esc(t) + '”.</div>';
   }
 
