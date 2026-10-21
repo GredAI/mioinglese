@@ -161,6 +161,7 @@
     if (route.name === 'racconti') return raccontiScreen();
     if (route.name === 'schemi') return schemiScreen();
     if (route.name === 'tempi') return tempiScreen();
+    if (route.name === 'ascolto') return ascoltoScreen();
     if (route.name === 'racc') return raccDetail(route.arg);
     if (route.name === 'preferiti') return preferitiScreen();
     if (route.name === 'componi') return componiScreen();
@@ -503,7 +504,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v80</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v81</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -518,6 +519,7 @@
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
+      tile('ascolto', '🎧', 'Ascolto', 'playlist, timer, audio') +
       tile('tempi', '⏳', 'Tempi verbali', (D.tempi ? D.tempi.length : 0) + ' tempi, attivo e passivo') +
       tile('vocab', '🔤', 'Vocabolario', D.vocab.length + ' parole') +
       tile('frasi', '💬', 'Modi di dire', D.idiomi.length + ' frasi') +
@@ -575,7 +577,7 @@
   }
 
   /* ---------- render + events ---------- */
-  function render() { document.getElementById('screen').innerHTML = screenHtml(); renderTabs(); }
+  function render() { document.getElementById('screen').innerHTML = screenHtml(); renderTabs(); if (route.name === 'ascolto') lpStatus(); }
   function go(name, arg) { route = { name: name, arg: arg }; window.scrollTo(0, 0); render(); }
 
   document.addEventListener('click', function (e) {
@@ -596,6 +598,7 @@
         if (r) pushRecent({ id: 'rule:' + n, label: 'Regola ' + n + ': ' + r.title });
       }
     }
+    else if (act.charAt(0) === 'l' && /^(lopt|lpause|lstop|lgrp|lall|lnone|lsel|lexport)$/.test(act)) { lclick(act, arg, el); }
     else if (act === 'schema') {
       // apri/chiudi la card dello schema SUL POSTO, senza ricostruire la schermata
       var si = +arg, schemaEl = el.closest('.schemecard');
@@ -701,6 +704,162 @@
       if (i < txt.length) frag.appendChild(document.createTextNode(txt.slice(i)));
       node.parentNode.replaceChild(frag, node);
     });
+  }
+
+  /* ---------- ASCOLTO (lettura continua, timer, ripetizione, esporta) ---------- */
+  var LG = [
+    { id: 'regole', label: 'Regole', n: function () { return D.rules.length; }, name: function (i) { return D.rules[i].n + '. ' + D.rules[i].title; } },
+    { id: 'schemi', label: 'Schemi', n: function () { return (D.schemi || []).length; }, name: function (i) { return D.schemi[i].title; } },
+    { id: 'tempi', label: 'Tempi verbali', n: function () { return (D.tempi || []).length; }, name: function (i) { return D.tempi[i].tense; } },
+    { id: 'vocab', label: 'Vocabolario', n: function () { return D.vocab.length; }, name: function (i) { return D.vocab[i].en + ' — ' + D.vocab[i].it; } },
+    { id: 'frasi', label: 'Modi di dire', n: function () { return D.idiomi.length; }, name: function (i) { return D.idiomi[i].en; } },
+    { id: 'phrasal', label: 'Phrasal verbs', n: function () { return (D.phrasal || []).length; }, name: function (i) { return D.phrasal[i].pv; } }
+  ];
+  var lsel = {}, lopen = {};
+  (function () { var s = load('listenSel', {}); LG.forEach(function (g) { lsel[g.id] = new Set(s[g.id] || []); }); })();
+  function saveLsel() { var o = {}; LG.forEach(function (g) { o[g.id] = Array.from(lsel[g.id]); }); save('listenSel', o); }
+  var lopts = load('listenOpts', { min: 30, loop: true, rate: 0.9 });
+  var lp = { playing: false, paused: false, queue: [], idx: 0, endAt: 0, timer: null, wake: null };
+  var IT_WORDS = /\b(che|il|lo|la|le|gli|di|del|della|dei|per|non|è|con|un|una|si|mai|sempre|quando|dopo|prima|come|sono|ho|hai|ha|ci|mi|ti|al|nel|più|anche|se|ma|da|in|su|o|e)\b/gi;
+  function langOf(s) { var m = s.match(IT_WORDS); var w = s.split(/\s+/).length; return (/[àèéìòù]/.test(s) || (m && m.length / w > 0.25)) ? 'it' : 'en'; }
+  function clean(s) { return (s || '').replace(/\*\*|\[\[|\]\]/g, '').replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim(); }
+  function pushL(a, l, t) { t = clean(t); if (t) a.push({ l: l, t: t }); }
+  function buildSegs(g, i) {
+    var a = [];
+    if (g === 'regole') {
+      var r = D.rules[i]; pushL(a, 'it', 'Regola ' + r.n + '. ' + r.title);
+      r.items.forEach(function (it) { if (it.t === 'exp') pushL(a, 'it', it.s); else if (it.t === 'right') it.s.split(/\s{2,}\/\s{2,}|\s·\s/).forEach(function (x) { pushL(a, 'en', x); }); });
+    } else if (g === 'schemi') {
+      var s = D.schemi[i]; pushL(a, 'it', s.title);
+      if (s.blocks) {
+        s.blocks.forEach(function (b) {
+          if (b.h) pushL(a, 'it', b.h);
+          (b.rows || []).forEach(function (r) {
+            if (b.type === 'flow') { pushL(a, 'it', r.q); pushL(a, 'en', r.ex); pushL(a, 'it', r.it); }
+            else if (b.type === 'rows') { pushL(a, 'en', r.key); pushL(a, 'en', r.ex); pushL(a, 'it', r.it); }
+            else if (b.type === 'grid') { r.cells.forEach(function (c) { pushL(a, 'en', c.t); }); }
+          });
+        });
+      } else {
+        var skipFirst = /^sbagliato|^il mio tentativo/i.test(s.cols[0] || '');
+        s.rows.forEach(function (r) {
+          r.forEach(function (c, ci) {
+            if (skipFirst && ci === 0) return;
+            var first = String(c).split('\n')[0];
+            first.split(/\s·\s/).forEach(function (x) { pushL(a, langOf(x), x); });
+          });
+        });
+      }
+      if (s.note) pushL(a, 'it', s.note);
+    } else if (g === 'tempi') {
+      var t = D.tempi[i]; pushL(a, 'en', t.tense); pushL(a, 'it', t.quando);
+      [['costrAttiva', 'attivoEn', 'attivoIt', 'Attivo'], ['costrNegAtt', 'negAttEn', 'negAttIt', 'Negativo'], ['costrPassiva', 'passivoEn', 'passivoIt', 'Passivo']].forEach(function (k) {
+        if (t[k[1]]) { pushL(a, 'it', k[3] + '. ' + (t[k[0]] || '')); pushL(a, 'en', t[k[1]]); pushL(a, 'it', t[k[2]]); }
+      });
+    } else if (g === 'vocab') { var v = D.vocab[i]; pushL(a, 'en', v.en.replace(/\(.*?\)/g, '')); pushL(a, 'it', v.it.replace(/\(.*?\)/g, '')); }
+    else if (g === 'frasi') { var d = D.idiomi[i]; pushL(a, 'en', d.en); pushL(a, 'it', d.it.replace(/\(.*?\)/g, '')); pushL(a, 'en', d.extra); }
+    else if (g === 'phrasal') { var p = D.phrasal[i]; pushL(a, 'en', p.pv); pushL(a, 'it', p.it); pushL(a, 'en', p.ex); }
+    return a;
+  }
+  function buildQueue() {
+    var q = [];
+    LG.forEach(function (g) { Array.from(lsel[g.id]).sort(function (x, y) { return x - y; }).forEach(function (i) { if (i < g.n()) q = q.concat(buildSegs(g.id, i)); }); });
+    return q;
+  }
+  function pickVoice(l) {
+    var vs = speechSynthesis.getVoices();
+    var re = l === 'it' ? /^it(-|_)?/i : /^en(-|_)?(GB|US|AU)?/i;
+    return vs.filter(function (x) { return re.test(x.lang); })[0];
+  }
+  function lpStatus(msg) {
+    var el = document.getElementById('lpstat'); if (!el) return;
+    var left = lp.endAt ? Math.max(0, Math.round((lp.endAt - Date.now()) / 60000)) : 0;
+    el.innerHTML = msg || (lp.playing ? (lp.paused ? '⏸ In pausa' : '▶︎ In ascolto') + ' · frase ' + (lp.idx + 1) + '/' + lp.queue.length + (lp.endAt ? ' · si spegne tra ' + left + ' min' : '') + '<div class="lcur">' + esc((lp.queue[lp.idx] || {}).t || '') + '</div>' : 'Pronta.');
+    var pb = document.getElementById('lpbtn'); if (pb) pb.textContent = lp.playing ? (lp.paused ? '▶︎ Riprendi' : '⏸ Pausa') : '▶︎ Avvia ascolto';
+    var sb = document.getElementById('lsbtn'); if (sb) sb.style.display = lp.playing ? '' : 'none';
+  }
+  function lpStep() {
+    if (!lp.playing || lp.paused) return;
+    if (lp.endAt && Date.now() >= lp.endAt) { lpStop('⏹ Spento automaticamente.'); return; }
+    if (lp.idx >= lp.queue.length) { if (lopts.loop) lp.idx = 0; else { lpStop('✓ Finito.'); return; } }
+    var s = lp.queue[lp.idx];
+    var u = new SpeechSynthesisUtterance(s.t); u.lang = s.l === 'it' ? 'it-IT' : 'en-GB'; u.rate = s.l === 'it' ? Math.min(1, lopts.rate + 0.05) : lopts.rate;
+    var v = pickVoice(s.l); if (v) u.voice = v;
+    var done = false, next = function () { if (done) return; done = true; lp.idx++; setTimeout(lpStep, 450); };
+    u.onend = next; u.onerror = next;
+    lpStatus();
+    speechSynthesis.speak(u);
+  }
+  function lpWake() { try { if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { lp.wake = w; }).catch(function () {}); } catch (e) {} }
+  function lpStart() {
+    if (!('speechSynthesis' in window)) { lpStatus('Questo dispositivo non supporta la lettura vocale.'); return; }
+    lp.queue = buildQueue();
+    if (!lp.queue.length) { lpStatus('Seleziona almeno un contenuto.'); return; }
+    speechSynthesis.cancel();
+    lp.playing = true; lp.paused = false; lp.idx = 0;
+    lp.endAt = lopts.min ? Date.now() + lopts.min * 60000 : 0;
+    lpWake(); lpStep();
+  }
+  function lpStop(msg) {
+    lp.playing = false; lp.paused = false;
+    try { speechSynthesis.cancel(); } catch (e) {}
+    try { if (lp.wake) lp.wake.release(); } catch (e) {} lp.wake = null;
+    lpStatus(msg || 'Fermato.');
+  }
+  function lpPause() {
+    if (!lp.playing) { lpStart(); return; }
+    if (lp.paused) { lp.paused = false; lpWake(); lpStep(); } else { lp.paused = true; try { speechSynthesis.cancel(); } catch (e) {} }
+    lpStatus();
+  }
+  setInterval(function () { if (lp.playing && !lp.paused) lpStatus(); }, 5000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && lp.playing && !lp.paused) lpWake(); });
+  function lopt(label, key, vals, fmt) {
+    return '<div class="lrow"><div class="llab">' + label + '</div><div class="tagbar">' + vals.map(function (v) {
+      return '<button class="tagbtn lchip' + (lopts[key] === v ? ' on' : '') + '" data-act="lopt" data-arg="' + key + ':' + v + '">' + fmt(v) + '</button>';
+    }).join('') + '</div></div>';
+  }
+  function ascoltoScreen() {
+    var tot = 0, nseg = 0; LG.forEach(function (g) { tot += lsel[g.id].size; });
+    var out = topBar('Ascolto', 'home') + '<main class="fade" id="body">' +
+      '<div class="lnote">Scegli cosa ascoltare, imposta durata e ripetizione, poi premi Avvia. <b>Per ascoltare di notte:</b> tieni lo schermo acceso (Impostazioni › Schermo › Blocco automatico › Mai, e in carica) oppure usa i file audio qui sotto: la voce dell\'app si ferma se lo schermo si blocca.</div>' +
+      '<div class="card lplayer"><div id="lpstat" class="lstat"></div>' +
+      '<button class="bigbtn" id="lpbtn" data-act="lpause">▶︎ Avvia ascolto</button>' +
+      '<button class="bigbtn alt" id="lsbtn" data-act="lstop" style="display:none">⏹ Ferma</button></div>' +
+      lopt('Durata (poi si spegne)', 'min', [15, 30, 60, 90, 120, 0], function (v) { return v ? v + ' min' : '∞'; }) +
+      lopt('Quando finisce la lista', 'loop', [false, true], function (v) { return v ? '🔁 Ripeti' : 'Ferma'; }) +
+      lopt('Velocità', 'rate', [0.7, 0.8, 0.9, 1], function (v) { return '×' + v; }) +
+      '<div class="hgroup">Contenuti (' + tot + ' selezionati)</div>';
+    LG.forEach(function (g) {
+      var n = g.n(), c = lsel[g.id].size, open = lopen[g.id];
+      out += '<div class="card lgrp"><div class="head"><span class="ctitle">' + g.label + '<span class="cdesc">' + c + ' / ' + n + ' selezionati</span></span>' +
+        '<button class="lmini" data-act="lall" data-arg="' + g.id + '">Tutti</button><button class="lmini" data-act="lnone" data-arg="' + g.id + '">Nessuno</button>' +
+        '<button class="lmini" data-act="lgrp" data-arg="' + g.id + '">' + (open ? '▲' : 'Scegli') + '</button></div>';
+      if (open) {
+        out += '<div class="llist">';
+        for (var i = 0; i < n; i++) out += '<label class="litem"><input type="checkbox" data-act="lsel" data-arg="' + g.id + ':' + i + '"' + (lsel[g.id].has(i) ? ' checked' : '') + '><span>' + esc(g.name(i)) + '</span></label>';
+        out += '</div>';
+      }
+      out += '</div>';
+    });
+    out += '<div class="hgroup">File audio (per iPod, iPhone, Musica)</div><div class="lnote">Esporta la selezione come testo, poi sul Mac lancia lo script <b>Crea_audio.py</b> (nella cartella Inglese) per ottenere un file audio da copiare sul dispositivo: va avanti anche a schermo bloccato.</div>' +
+      '<button class="bigbtn alt" data-act="lexport">⬇︎ Esporta selezione per audio</button><div id="lexp" class="lnote"></div></main>';
+    return out;
+  }
+  function lclick(act, arg, el) {
+    if (act === 'lopt') { var k = arg.split(':'); var val = k[1] === 'true' ? true : k[1] === 'false' ? false : +k[1]; lopts[k[0]] = val; save('listenOpts', lopts); el.parentNode.querySelectorAll('.lchip').forEach(function (b) { b.classList.remove('on'); }); el.classList.add('on'); }
+    else if (act === 'lpause') lpPause();
+    else if (act === 'lstop') lpStop();
+    else if (act === 'lgrp') { lopen[arg] = !lopen[arg]; render(); }
+    else if (act === 'lall') { var g = LG.filter(function (x) { return x.id === arg; })[0]; for (var i = 0; i < g.n(); i++) lsel[arg].add(i); saveLsel(); render(); }
+    else if (act === 'lnone') { lsel[arg].clear(); saveLsel(); render(); }
+    else if (act === 'lsel') { var p = arg.split(':'); if (lsel[p[0]].has(+p[1])) lsel[p[0]].delete(+p[1]); else lsel[p[0]].add(+p[1]); saveLsel(); }
+    else if (act === 'lexport') {
+      var q = buildQueue(), e = document.getElementById('lexp');
+      if (!q.length) { if (e) e.textContent = 'Seleziona almeno un contenuto.'; return; }
+      var txt = q.map(function (s) { return s.l + '\t' + s.t; }).join('\n');
+      try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = 'ascolto.txt'; document.body.appendChild(a); a.click(); a.remove(); } catch (er) {}
+      if (e) e.textContent = q.length + ' frasi esportate in ascolto.txt (cartella Download). Sul Mac: python3 Crea_audio.py ascolto.txt';
+    }
   }
 
   /* ---------- service worker ---------- */
