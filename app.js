@@ -504,7 +504,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v83</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v84</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -718,7 +718,7 @@
   var lsel = {}, lopen = {};
   (function () { var s = load('listenSel', {}); LG.forEach(function (g) { lsel[g.id] = new Set(s[g.id] || []); }); })();
   function saveLsel() { var o = {}; LG.forEach(function (g) { o[g.id] = Array.from(lsel[g.id]); }); save('listenSel', o); }
-  var lopts = load('listenOpts', { min: 30, loop: true, rate: 0.9 });
+  var lopts = load('listenOpts', { min: 30, loop: true, rate: 0.9, mode: 'lezione' });
   var lp = { playing: false, paused: false, queue: [], idx: 0, endAt: 0, timer: null, wake: null };
   var IT_WORDS = /\b(che|il|lo|la|le|gli|di|del|della|dei|per|non|è|con|un|una|si|mai|sempre|quando|dopo|prima|come|sono|ho|hai|ha|ci|mi|ti|al|nel|più|anche|se|ma|da|in|su|o|e)\b/gi;
   function langOf(s) { var m = s.match(IT_WORDS); var w = s.split(/\s+/).length; return (/[àèéìòù]/.test(s) || (m && m.length / w > 0.25)) ? 'it' : 'en'; }
@@ -819,8 +819,21 @@
   }
   function buildQueue() {
     var q = [];
-    LG.forEach(function (g) { Array.from(lsel[g.id]).sort(function (x, y) { return x - y; }).forEach(function (i) { if (i < g.n()) q = q.concat(buildSegs(g.id, i)); }); });
-    return q;
+    LG.forEach(function (g) { Array.from(lsel[g.id]).sort(function (x, y) { return x - y; }).forEach(function (i) { if (i < g.n()) buildSegs(g.id, i).forEach(function (s) { s.src = g.id; q.push(s); }); }); });
+    if (lopts.mode !== 'sonno') return q;
+    // modalità sonno: solo frasi inglesi (niente parole singole tranne dal Vocabolario), senza doppioni, ognuna ripetuta 2 volte, lenta, con pause lunghe
+    var seen = {}, out = [], gid = 0;
+    q.forEach(function (s) {
+      if (s.l !== 'en') return;
+      var nw = s.t.split(/\s+/).length;
+      if (nw < 2 && s.src !== 'vocab') return;
+      if (nw > 28) return;
+      var k = s.t.toLowerCase(); if (seen[k]) return; seen[k] = 1;
+      gid++;
+      out.push({ l: 'en', t: s.t, g: gid, pause: 2500, wpm: 125, sleep: true });
+      out.push({ l: 'en', t: s.t, g: gid, pause: 5000, wpm: 125, sleep: true });
+    });
+    return out;
   }
   function pickVoice(l) {
     var vs = speechSynthesis.getVoices();
@@ -839,9 +852,9 @@
     if (lp.endAt && Date.now() >= lp.endAt) { lpStop('⏹ Spento automaticamente.'); return; }
     if (lp.idx >= lp.queue.length) { if (lopts.loop) lp.idx = 0; else { lpStop('✓ Finito.'); return; } }
     var s = lp.queue[lp.idx];
-    var u = new SpeechSynthesisUtterance(s.t); u.lang = s.l === 'it' ? 'it-IT' : 'en-GB'; u.rate = s.l === 'it' ? Math.min(1, lopts.rate + 0.05) : lopts.rate;
+    var u = new SpeechSynthesisUtterance(s.t); u.lang = s.l === 'it' ? 'it-IT' : 'en-GB'; u.rate = s.sleep ? 0.72 : (s.l === 'it' ? Math.min(1, lopts.rate + 0.05) : lopts.rate);
     var v = pickVoice(s.l); if (v) u.voice = v;
-    var nx = lp.queue[lp.idx + 1], gap = (nx && nx.g === s.g) ? 120 : 600;
+    var nx = lp.queue[lp.idx + 1], gap = s.pause || ((nx && nx.g === s.g) ? 120 : 600);
     var done = false, next = function () { if (done) return; done = true; lp.idx++; setTimeout(lpStep, gap); };
     u.onend = next; u.onerror = next;
     lpStatus();
@@ -882,6 +895,7 @@
       '<div class="card lplayer"><div id="lpstat" class="lstat"></div>' +
       '<button class="bigbtn" id="lpbtn" data-act="lpause">▶︎ Avvia ascolto</button>' +
       '<button class="bigbtn alt" id="lsbtn" data-act="lstop" style="display:none">⏹ Ferma</button></div>' +
+      lopt('Modalità', 'mode', ['lezione', 'sonno'], function (v) { return v === 'sonno' ? '🌙 Sonno: solo inglese, lento, in loop' : '📖 Lezione: italiano + inglese'; }) +
       lopt('Durata (poi si spegne)', 'min', [15, 30, 60, 90, 120, 0], function (v) { return v ? v + ' min' : '∞'; }) +
       lopt('Quando finisce la lista', 'loop', [false, true], function (v) { return v ? '🔁 Ripeti' : 'Ferma'; }) +
       lopt('Velocità', 'rate', [0.7, 0.8, 0.9, 1], function (v) { return '×' + v; }) +
@@ -902,7 +916,7 @@
     return out;
   }
   function lclick(act, arg, el) {
-    if (act === 'lopt') { var k = arg.split(':'); var val = k[1] === 'true' ? true : k[1] === 'false' ? false : +k[1]; lopts[k[0]] = val; save('listenOpts', lopts); el.parentNode.querySelectorAll('.lchip').forEach(function (b) { b.classList.remove('on'); }); el.classList.add('on'); }
+    if (act === 'lopt') { var k = arg.split(':'); var val = k[1] === 'true' ? true : k[1] === 'false' ? false : (isNaN(+k[1]) ? k[1] : +k[1]); lopts[k[0]] = val; save('listenOpts', lopts); el.parentNode.querySelectorAll('.lchip').forEach(function (b) { b.classList.remove('on'); }); el.classList.add('on'); }
     else if (act === 'lpause') lpPause();
     else if (act === 'lstop') lpStop();
     else if (act === 'lgrp') { lopen[arg] = !lopen[arg]; render(); }
@@ -912,7 +926,7 @@
     else if (act === 'lexport') {
       var q = buildQueue(), e = document.getElementById('lexp');
       if (!q.length) { if (e) e.textContent = 'Seleziona almeno un contenuto.'; return; }
-      var txt = q.map(function (s) { return s.l + '\t' + s.t + '\t' + s.g; }).join('\n');
+      var txt = q.map(function (s) { return s.l + '\t' + s.t + '\t' + s.g + '\t' + (s.pause ? s.pause / 1000 : '') + '\t' + (s.wpm || ''); }).join('\n');
       try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = 'ascolto.txt'; document.body.appendChild(a); a.click(); a.remove(); } catch (er) {}
       if (e) e.textContent = q.length + ' frasi esportate in ascolto.txt (cartella Download). Sul Mac: python3 Crea_audio.py ascolto.txt';
     }
