@@ -101,12 +101,13 @@
 
   /* ---------- rendering pieces ---------- */
   function ruleCard(r, open) {
-    var desc = (r.items[0] && r.items[0].s ? r.items[0].s.replace(/\*\*|\[\[|\]\]/g, '') : '');
-    var chars = r.items.map(function (i) { return i.s || ''; }).join(' ').length;
+    var vis = r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; });
+    var desc = (vis[0] && vis[0].s ? vis[0].s.replace(/\*\*|\[\[|\]\]/g, '') : '');
+    var chars = vis.map(function (i) { return i.s || ''; }).join(' ').length;
     var lunga = chars > 500 ? '<span class="lunga">LUNGA</span>' : '';
     var tag = ruleTag[r.n];
     var dot = tag ? '<span class="tagdot" style="background:' + RULE_TAGS[tag].color + '" title="' + esc(RULE_TAGS[tag].label) + '"></span>' : '';
-    var body = r.items.map(function (it) {
+    var body = vis.map(function (it) {
       if (it.t === 'exp') return '<p class="exp">' + bold(it.s) + '</p>';
       return '<div class="exline ' + it.t + '"><b>' + (it.t === 'wrong' ? '✗' : '✓') + '</b><span>' + posm(esc(it.s)) + '</span></div>';
     }).join('');
@@ -181,7 +182,7 @@
   function regoleBody(term) {
     var t = term.toLowerCase();
     var cats = D.catOrder || [];
-    function match(r) { return !t || (r.title + ' ' + r.items.map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; }
+    function match(r) { return !t || (r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; }
     var matched = D.rules.filter(match);
     // barra dei chip (categorie), con conteggio in base alla ricerca
     var chips = '<button class="chip2 ' + (regCat === 'all' ? 'on' : '') + '" data-act="regcat" data-arg="all">Tutte (' + matched.length + ')</button>';
@@ -504,7 +505,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v84</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v85</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -538,7 +539,7 @@
   }
   function searchAll(t) {
     var out = '';
-    var rr = D.rules.filter(function (r) { return (r.title + ' ' + r.items.map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; });
+    var rr = D.rules.filter(function (r) { return (r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; });
     if (rr.length) out += '<div class="hgroup">Regole (' + rr.length + ')</div>' + rr.map(function (r) { return ruleCard(r, openRules.has(r.n)); }).join('');
     var vv = D.vocab.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.en + ' ' + x.d.it).toLowerCase().indexOf(t) >= 0; });
     if (vv.length) out += '<div class="hgroup">Vocaboli (' + vv.length + ')</div>' + vv.map(function (x) { return vocRow(x.d, x.i); }).join('');
@@ -784,6 +785,8 @@
     var a = [];
     if (g === 'regole') {
       var r = D.rules[i]; pushL(a, 'it', 'Regola ' + r.n + '. ' + r.title);
+      var au = r.items.some(function (it) { return it.t === 'audio'; });
+      if (au) { r.items.forEach(function (it) { if (it.t === 'audioit') pushL(a, 'it', it.s); else if (it.t === 'audio') a.push({ l: 'en', t: clean(it.s), g: ++segGroup }); }); return a; }
       r.items.forEach(function (it) { if (it.t === 'exp') pushL(a, 'it', it.s); else if (it.t === 'right') it.s.split(/\s{2,}\/\s{2,}|\s·\s/).forEach(function (x) { pushL(a, 'en', x); }); });
     } else if (g === 'schemi') {
       var s = D.schemi[i]; pushL(a, 'it', s.title);
