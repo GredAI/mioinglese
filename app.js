@@ -504,7 +504,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v82</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v83</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -888,9 +888,8 @@
       '<div class="hgroup">Contenuti (' + tot + ' selezionati)</div>';
     LG.forEach(function (g) {
       var n = g.n(), c = lsel[g.id].size, open = lopen[g.id];
-      out += '<div class="card lgrp"><div class="head"><span class="ctitle">' + g.label + '<span class="cdesc">' + c + ' / ' + n + ' selezionati</span></span>' +
-        '<button class="lmini" data-act="lall" data-arg="' + g.id + '">Tutti</button><button class="lmini" data-act="lnone" data-arg="' + g.id + '">Nessuno</button>' +
-        '<button class="lmini" data-act="lgrp" data-arg="' + g.id + '">' + (open ? '▲' : 'Scegli') + '</button></div>';
+      out += '<div class="card lgrp"><div class="head" data-act="lgrp" data-arg="' + g.id + '"><span class="ctitle">' + g.label + '<span class="cdesc">' + c + ' / ' + n + ' selezionati</span></span><span class="chev" style="transform:rotate(' + (open ? 90 : 0) + 'deg)">›</span></div>' +
+        '<div class="lacts"><button class="lmini" data-act="lall" data-arg="' + g.id + '">Tutti</button><button class="lmini" data-act="lnone" data-arg="' + g.id + '">Nessuno</button><button class="lmini" data-act="lgrp" data-arg="' + g.id + '">' + (open ? 'Chiudi elenco' : 'Scegli…') + '</button></div>';
       if (open) {
         out += '<div class="llist">';
         for (var i = 0; i < n; i++) out += '<label class="litem"><input type="checkbox" data-act="lsel" data-arg="' + g.id + ':' + i + '"' + (lsel[g.id].has(i) ? ' checked' : '') + '><span>' + esc(g.name(i)) + '</span></label>';
