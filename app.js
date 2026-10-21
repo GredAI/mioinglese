@@ -504,7 +504,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v81</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v82</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -723,7 +723,63 @@
   var IT_WORDS = /\b(che|il|lo|la|le|gli|di|del|della|dei|per|non|è|con|un|una|si|mai|sempre|quando|dopo|prima|come|sono|ho|hai|ha|ci|mi|ti|al|nel|più|anche|se|ma|da|in|su|o|e)\b/gi;
   function langOf(s) { var m = s.match(IT_WORDS); var w = s.split(/\s+/).length; return (/[àèéìòù]/.test(s) || (m && m.length / w > 0.25)) ? 'it' : 'en'; }
   function clean(s) { return (s || '').replace(/\*\*|\[\[|\]\]/g, '').replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim(); }
-  function pushL(a, l, t) { t = clean(t); if (t) a.push({ l: l, t: t }); }
+  var EN_FN = new Set('the a an is are was were be been being am i you he she it we they me him her us them my your his its our their this that these those and or but if so to of in on at for from with without by as not no do does did done doing have has had having can could will would shall should may might must there here what who which whose when where why how all any some many much more most very too also just only still even ever never always usually often yes please thanks thank hello hi okay ok one two three four five six seven eight nine ten like love want need get got go goes went going make made take took come came say said tell told know knew think see saw look give gave find found work live eat ate drink drank play speak spoke talk read write wrote buy bought ask learn study try use help call feel put keep let leave left about after before again ago because between during into over under up down out off than then now today yesterday tomorrow week month year day night morning time people friend friends man men woman women child children home house city name good bad big small old new young long short nice great happy sad tired ready right wrong sorry well really maybe something anything nothing someone anyone everyone each every both either neither own same other another next last first second present perfect simple continuous past future conditional passive'.split(' '));
+  var IT_FN = new Set('il lo la le gli i un uno una di del dello della dei degli delle da dal dalla dai nel nella nei nelle sul sulla al alla ai alle con per tra fra su in a e o ma se che chi cui non è sono sei siamo siete era erano ho hai ha abbiamo hanno essere avere fare fatto fa si mi ti ci vi lo ne come quando dove perché quindi anche più meno molto poco tanto sempre mai già ancora solo prima dopo mentre durante questo questa questi queste quello quella quelle suo sua suoi sue mio mia miei mie tuo tua nostro nostra loro ogni tutto tutti tutte altro altra altri stesso stessa dentro fuori sopra sotto davanti dietro insieme senza verso circa oppure invece quindi dunque quale quali quanto quanti parola parole frase frasi verbo verbi nome nomi regola uso usa usare si usa vuole vogliono serve vanno va vengono viene può possono deve devono significa vuol dire esempio esempi errore errori giusto sbagliato attenzione nota sempre mai spesso presente passato futuro persone cose luogo luoghi tempo tempi azione azioni abitudine abitudini'.split(' '));
+  var LEX = null;
+  function tok(s) { return (s || '').toLowerCase().replace(/[^a-zàèéìòùçñ'’\- ]/g, ' ').split(/\s+/).filter(Boolean); }
+  function buildLex() {
+    var en = {}, it = {};
+    function add(m, s) { tok(s).forEach(function (w) { m[w] = (m[w] || 0) + 1; }); }
+    D.vocab.forEach(function (v) { add(en, v.en); add(it, v.it); });
+    D.idiomi.forEach(function (v) { add(en, v.en + ' ' + v.extra); add(it, v.it); });
+    (D.phrasal || []).forEach(function (v) { add(en, v.pv + ' ' + v.ex + ' ' + v.eq); add(it, v.it); });
+    (D.tempi || []).forEach(function (x) { add(en, [x.attivoEn, x.passivoEn, x.negAttEn, x.negPasEn].join(' ')); add(it, [x.attivoIt, x.passivoIt, x.negAttIt, x.negPasIt, x.quando].join(' ')); });
+    D.rules.forEach(function (r) { r.items.forEach(function (i) { if (i.t === 'right') add(en, i.s); }); });
+    LEX = { en: en, it: it };
+  }
+  function wlang(w) {
+    var c = w.toLowerCase().replace(/^[^a-zàèéìòù']+|[^a-zàèéìòù']+$/g, '');
+    if (!c) return null;
+    if (/[àèéìòù]/.test(c)) return 'it';
+    if (/'|’/.test(c) && /^(i|you|he|she|it|we|they|that|there|what|who|don|doesn|didn|isn|aren|wasn|weren|haven|hasn|hadn|won|can|couldn|wouldn|shouldn)[’']/.test(c)) return 'en';
+    if (/[’']s$/.test(c) || /n[’']t$/.test(c)) return 'en';
+    if (EN_FN.has(c) && IT_FN.has(c)) return null;
+    if (IT_FN.has(c)) return 'it';
+    if (EN_FN.has(c)) return 'en';
+    if (!LEX) buildLex();
+    var e = LEX.en[c] || 0, i = LEX.it[c] || 0;
+    if (e > i) return 'en'; if (i > e) return 'it';
+    if (c.length > 3 && /[aeiouàèéìòù]$/.test(c) && !/^[A-Z]/.test(w)) return 'it';
+    if (/[bcdfghklmnpqrstvwxyz]$/.test(c) && c.length > 2) return 'en';
+    return null;
+  }
+  function splitLang(text, base) {
+    var toks = text.replace(/\s*[→=]\s*/g, ' , ').split(/\s+/).filter(Boolean);
+    var labs = toks.map(function (w) { return wlang(w); }), orig = labs.slice();
+    // parole neutre: ereditano dalla vicina più prossima
+    var last = null;
+    for (var i = 0; i < labs.length; i++) { if (labs[i]) last = labs[i]; else labs[i] = last; }
+    last = null;
+    for (var j = labs.length - 1; j >= 0; j--) { if (labs[j]) last = labs[j]; else labs[j] = last || base; }
+    for (var m = 1; m < labs.length - 1; m++) {
+      if (orig[m] === null && labs[m - 1] === labs[m + 1] && labs[m] !== labs[m - 1] && !EN_FN.has(toks[m].toLowerCase().replace(/[^a-z']/g, '')) && !IT_FN.has(toks[m].toLowerCase())) labs[m] = labs[m - 1];
+    }
+    // una lingua diversa da quella di base, se dura meno di 3 parole, si legge con la voce di base (meno cambi di voce = più comprensibile)
+    var runs = [], r0 = null;
+    labs.forEach(function (l, k) { if (r0 && r0.l === l) r0.e = k; else { r0 = { l: l, s: k, e: k }; runs.push(r0); } });
+    runs.forEach(function (r) { if (r.l !== base && (r.e - r.s + 1) < 3) for (var q = r.s; q <= r.e; q++) labs[q] = base; });
+    var out = [], cur = null;
+    toks.forEach(function (w, k) {
+      if (cur && cur.l === labs[k]) cur.t += ' ' + w; else { cur = { l: labs[k], t: w }; out.push(cur); }
+    });
+    return out;
+  }
+  var segGroup = 0;
+  function pushL(a, l, t) {
+    t = clean(t); if (!t) return;
+    segGroup++;
+    splitLang(t, l).forEach(function (s) { var x = s.t.replace(/^[,\s]+|[,\s]+$/g, ''); if (/[a-zA-Zàèéìòù]/.test(x)) a.push({ l: s.l, t: x, g: segGroup }); });
+  }
   function buildSegs(g, i) {
     var a = [];
     if (g === 'regole') {
@@ -785,7 +841,8 @@
     var s = lp.queue[lp.idx];
     var u = new SpeechSynthesisUtterance(s.t); u.lang = s.l === 'it' ? 'it-IT' : 'en-GB'; u.rate = s.l === 'it' ? Math.min(1, lopts.rate + 0.05) : lopts.rate;
     var v = pickVoice(s.l); if (v) u.voice = v;
-    var done = false, next = function () { if (done) return; done = true; lp.idx++; setTimeout(lpStep, 450); };
+    var nx = lp.queue[lp.idx + 1], gap = (nx && nx.g === s.g) ? 120 : 600;
+    var done = false, next = function () { if (done) return; done = true; lp.idx++; setTimeout(lpStep, gap); };
     u.onend = next; u.onerror = next;
     lpStatus();
     speechSynthesis.speak(u);
@@ -856,7 +913,7 @@
     else if (act === 'lexport') {
       var q = buildQueue(), e = document.getElementById('lexp');
       if (!q.length) { if (e) e.textContent = 'Seleziona almeno un contenuto.'; return; }
-      var txt = q.map(function (s) { return s.l + '\t' + s.t; }).join('\n');
+      var txt = q.map(function (s) { return s.l + '\t' + s.t + '\t' + s.g; }).join('\n');
       try { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([txt], { type: 'text/plain' })); a.download = 'ascolto.txt'; document.body.appendChild(a); a.click(); a.remove(); } catch (er) {}
       if (e) e.textContent = q.length + ' frasi esportate in ascolto.txt (cartella Download). Sul Mac: python3 Crea_audio.py ascolto.txt';
     }
