@@ -36,6 +36,7 @@
   function speak(text) {
     try {
       if (!('speechSynthesis' in window)) return;
+      unlockVoice();
       speechSynthesis.cancel();
       var say = SAY[text.trim().toLowerCase()] || text;
       var u = new SpeechSynthesisUtterance(say);
@@ -46,13 +47,14 @@
       speechSynthesis.speak(u);
     } catch (e) {}
   }
-  // iOS: "sblocca" la sintesi vocale al primo tocco (altrimenti a volte resta muta)
+  // iOS: "sblocca" la sintesi vocale la prima volta che serve (dentro il tocco sul pulsante),
+  // non al primo tocco in assoluto: inizializzare l'audio subito bloccava i primi tap sulle card.
   var voiceReady = false;
-  document.addEventListener('touchstart', function () {
+  function unlockVoice() {
     if (voiceReady || !('speechSynthesis' in window)) return;
     voiceReady = true;
     try { var w = new SpeechSynthesisUtterance(' '); w.volume = 0; speechSynthesis.speak(w); } catch (e) {}
-  }, { once: false, passive: true });
+  }
   function keyOf(en) {
     var s = en.toLowerCase(), prev;
     do { prev = s; s = s.replace(/^(to be |to have |to |your |my |his |her |their |our |a |an |the )/, ''); } while (s !== prev);
@@ -505,7 +507,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v85</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v87</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -599,7 +601,7 @@
         if (r) pushRecent({ id: 'rule:' + n, label: 'Regola ' + n + ': ' + r.title });
       }
     }
-    else if (act.charAt(0) === 'l' && /^(lopt|lpause|lstop|lgrp|lall|lnone|lsel|lexport)$/.test(act)) { lclick(act, arg, el); }
+    else if (act.charAt(0) === 'l' && /^(lopt|lpause|lstop|lgrp|lall|lnone|lsel|lexport|lex|lrestore|lrestoreall|lexcur)$/.test(act)) { lclick(act, arg, el); }
     else if (act === 'schema') {
       // apri/chiudi la card dello schema SUL POSTO, senza ricostruire la schermata
       var si = +arg, schemaEl = el.closest('.schemecard');
@@ -672,6 +674,7 @@
     else if (act === 'compose-del') { var a3 = load('composed', []); a3.splice(+arg, 1); save('composed', a3); render(); }
   });
   document.addEventListener('input', function (e) {
+    if (e.target.id === 'lq') { lexq = e.target.value; var rs = document.getElementById('lqres'); if (rs) rs.innerHTML = lqResults(); return; }
     if (e.target.id !== 'q') return;
     var b = document.getElementById('body'); if (!b) return;
     var term = e.target.value;
@@ -716,11 +719,12 @@
     { id: 'frasi', label: 'Modi di dire', n: function () { return D.idiomi.length; }, name: function (i) { return D.idiomi[i].en; } },
     { id: 'phrasal', label: 'Phrasal verbs', n: function () { return (D.phrasal || []).length; }, name: function (i) { return D.phrasal[i].pv; } }
   ];
-  var lsel = {}, lopen = {};
+  var lsel = {}, lopen = {}, lexcl = load('listenExcl', {}), lexq = '';
+  function saveLexcl() { save('listenExcl', lexcl); }
   (function () { var s = load('listenSel', {}); LG.forEach(function (g) { lsel[g.id] = new Set(s[g.id] || []); }); })();
   function saveLsel() { var o = {}; LG.forEach(function (g) { o[g.id] = Array.from(lsel[g.id]); }); save('listenSel', o); }
   var lopts = load('listenOpts', { min: 30, loop: true, rate: 0.9, mode: 'lezione' });
-  var lp = { playing: false, paused: false, queue: [], idx: 0, endAt: 0, timer: null, wake: null };
+  var lp = { gen: 0, playing: false, paused: false, queue: [], idx: 0, endAt: 0, timer: null, wake: null };
   var IT_WORDS = /\b(che|il|lo|la|le|gli|di|del|della|dei|per|non|è|con|un|una|si|mai|sempre|quando|dopo|prima|come|sono|ho|hai|ha|ci|mi|ti|al|nel|più|anche|se|ma|da|in|su|o|e)\b/gi;
   function langOf(s) { var m = s.match(IT_WORDS); var w = s.split(/\s+/).length; return (/[àèéìòù]/.test(s) || (m && m.length / w > 0.25)) ? 'it' : 'en'; }
   function clean(s) { return (s || '').replace(/\*\*|\[\[|\]\]/g, '').replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim(); }
@@ -775,25 +779,26 @@
     });
     return out;
   }
-  var segGroup = 0;
+  var segGroup = 0, curKey = '';
   function pushL(a, l, t) {
     t = clean(t); if (!t) return;
     segGroup++;
-    splitLang(t, l).forEach(function (s) { var x = s.t.replace(/^[,\s]+|[,\s]+$/g, ''); if (/[a-zA-Zàèéìòù]/.test(x)) a.push({ l: s.l, t: x, g: segGroup }); });
+    splitLang(t, l).forEach(function (s) { var x = s.t.replace(/^[,\s]+|[,\s]+$/g, ''); if (/[a-zA-Zàèéìòù]/.test(x)) a.push({ l: s.l, t: x, g: segGroup, k: curKey }); });
   }
   function buildSegs(g, i) {
-    var a = [];
+    var a = []; curKey = g + ':' + i;
     if (g === 'regole') {
       var r = D.rules[i]; pushL(a, 'it', 'Regola ' + r.n + '. ' + r.title);
       var au = r.items.some(function (it) { return it.t === 'audio'; });
-      if (au) { r.items.forEach(function (it) { if (it.t === 'audioit') pushL(a, 'it', it.s); else if (it.t === 'audio') a.push({ l: 'en', t: clean(it.s), g: ++segGroup }); }); return a; }
-      r.items.forEach(function (it) { if (it.t === 'exp') pushL(a, 'it', it.s); else if (it.t === 'right') it.s.split(/\s{2,}\/\s{2,}|\s·\s/).forEach(function (x) { pushL(a, 'en', x); }); });
+      if (au) { r.items.forEach(function (it) { if (it.t === 'audioit') pushL(a, 'it', it.s); else if (it.t === 'audio') a.push({ l: 'en', t: clean(it.s), g: ++segGroup, k: curKey }); }); return a; }
+      r.items.forEach(function (it, ii) { curKey = 'regole:' + i + ':' + ii; if (it.t === 'exp') pushL(a, 'it', it.s); else if (it.t === 'right') it.s.split(/\s{2,}\/\s{2,}|\s·\s/).forEach(function (x) { pushL(a, 'en', x); }); });
     } else if (g === 'schemi') {
       var s = D.schemi[i]; pushL(a, 'it', s.title);
       if (s.blocks) {
-        s.blocks.forEach(function (b) {
+        s.blocks.forEach(function (b, bi) {
           if (b.h) pushL(a, 'it', b.h);
-          (b.rows || []).forEach(function (r) {
+          (b.rows || []).forEach(function (r, ri) {
+            curKey = 'schemi:' + i + ':b' + bi + ':' + ri;
             if (b.type === 'flow') { pushL(a, 'it', r.q); pushL(a, 'en', r.ex); pushL(a, 'it', r.it); }
             else if (b.type === 'rows') { pushL(a, 'en', r.key); pushL(a, 'en', r.ex); pushL(a, 'it', r.it); }
             else if (b.type === 'grid') { r.cells.forEach(function (c) { pushL(a, 'en', c.t); }); }
@@ -801,7 +806,8 @@
         });
       } else {
         var skipFirst = /^sbagliato|^il mio tentativo/i.test(s.cols[0] || '');
-        s.rows.forEach(function (r) {
+        s.rows.forEach(function (r, ri) {
+          curKey = 'schemi:' + i + ':' + ri;
           r.forEach(function (c, ci) {
             if (skipFirst && ci === 0) return;
             var first = String(c).split('\n')[0];
@@ -809,20 +815,20 @@
           });
         });
       }
-      if (s.note) pushL(a, 'it', s.note);
+      curKey = 'schemi:' + i + ':note'; if (s.note) pushL(a, 'it', s.note);
     } else if (g === 'tempi') {
       var t = D.tempi[i]; pushL(a, 'en', t.tense); pushL(a, 'it', t.quando);
       [['costrAttiva', 'attivoEn', 'attivoIt', 'Attivo'], ['costrNegAtt', 'negAttEn', 'negAttIt', 'Negativo'], ['costrPassiva', 'passivoEn', 'passivoIt', 'Passivo']].forEach(function (k) {
-        if (t[k[1]]) { pushL(a, 'it', k[3] + '. ' + (t[k[0]] || '')); pushL(a, 'en', t[k[1]]); pushL(a, 'it', t[k[2]]); }
+        if (t[k[1]]) { curKey = 'tempi:' + i + ':' + k[3]; pushL(a, 'it', k[3] + '. ' + (t[k[0]] || '')); pushL(a, 'en', t[k[1]]); pushL(a, 'it', t[k[2]]); }
       });
     } else if (g === 'vocab') { var v = D.vocab[i]; pushL(a, 'en', v.en.replace(/\(.*?\)/g, '')); pushL(a, 'it', v.it.replace(/\(.*?\)/g, '')); }
     else if (g === 'frasi') { var d = D.idiomi[i]; pushL(a, 'en', d.en); pushL(a, 'it', d.it.replace(/\(.*?\)/g, '')); pushL(a, 'en', d.extra); }
     else if (g === 'phrasal') { var p = D.phrasal[i]; pushL(a, 'en', p.pv); pushL(a, 'it', p.it); pushL(a, 'en', p.ex); }
     return a;
   }
-  function buildQueue() {
+  function buildQueue(raw) {
     var q = [];
-    LG.forEach(function (g) { Array.from(lsel[g.id]).sort(function (x, y) { return x - y; }).forEach(function (i) { if (i < g.n()) buildSegs(g.id, i).forEach(function (s) { s.src = g.id; q.push(s); }); }); });
+    LG.forEach(function (g) { Array.from(lsel[g.id]).sort(function (x, y) { return x - y; }).forEach(function (i) { if (i < g.n()) buildSegs(g.id, i).forEach(function (s) { s.src = g.id; if (!lexcl[s.k]) q.push(s); }); }); });
     if (lopts.mode !== 'sonno') return q;
     // modalità sonno: solo frasi inglesi (niente parole singole tranne dal Vocabolario), senza doppioni, ognuna ripetuta 2 volte, lenta, con pause lunghe
     var seen = {}, out = [], gid = 0;
@@ -846,7 +852,7 @@
   function lpStatus(msg) {
     var el = document.getElementById('lpstat'); if (!el) return;
     var left = lp.endAt ? Math.max(0, Math.round((lp.endAt - Date.now()) / 60000)) : 0;
-    el.innerHTML = msg || (lp.playing ? (lp.paused ? '⏸ In pausa' : '▶︎ In ascolto') + ' · frase ' + (lp.idx + 1) + '/' + lp.queue.length + (lp.endAt ? ' · si spegne tra ' + left + ' min' : '') + '<div class="lcur">' + esc((lp.queue[lp.idx] || {}).t || '') + '</div>' : 'Pronta.');
+    el.innerHTML = msg || (lp.playing ? (lp.paused ? '⏸ In pausa' : '▶︎ In ascolto') + ' · frase ' + (lp.idx + 1) + '/' + lp.queue.length + (lp.endAt ? ' · si spegne tra ' + left + ' min' : '') + '<div class="lcur">' + esc((lp.queue[lp.idx] || {}).t || '') + '</div><button class="lmini" data-act="lexcur">🚫 Togli questa frase dall\'ascolto</button>' : 'Pronta.');
     var pb = document.getElementById('lpbtn'); if (pb) pb.textContent = lp.playing ? (lp.paused ? '▶︎ Riprendi' : '⏸ Pausa') : '▶︎ Avvia ascolto';
     var sb = document.getElementById('lsbtn'); if (sb) sb.style.display = lp.playing ? '' : 'none';
   }
@@ -854,11 +860,11 @@
     if (!lp.playing || lp.paused) return;
     if (lp.endAt && Date.now() >= lp.endAt) { lpStop('⏹ Spento automaticamente.'); return; }
     if (lp.idx >= lp.queue.length) { if (lopts.loop) lp.idx = 0; else { lpStop('✓ Finito.'); return; } }
-    var s = lp.queue[lp.idx];
+    var s = lp.queue[lp.idx], myGen = ++lp.gen;
     var u = new SpeechSynthesisUtterance(s.t); u.lang = s.l === 'it' ? 'it-IT' : 'en-GB'; u.rate = s.sleep ? 0.72 : (s.l === 'it' ? Math.min(1, lopts.rate + 0.05) : lopts.rate);
     var v = pickVoice(s.l); if (v) u.voice = v;
     var nx = lp.queue[lp.idx + 1], gap = s.pause || ((nx && nx.g === s.g) ? 120 : 600);
-    var done = false, next = function () { if (done) return; done = true; lp.idx++; setTimeout(lpStep, gap); };
+    var done = false, next = function () { if (done || myGen !== lp.gen) return; done = true; lp.idx++; setTimeout(lpStep, gap); };
     u.onend = next; u.onerror = next;
     lpStatus();
     speechSynthesis.speak(u);
@@ -868,6 +874,7 @@
     if (!('speechSynthesis' in window)) { lpStatus('Questo dispositivo non supporta la lettura vocale.'); return; }
     lp.queue = buildQueue();
     if (!lp.queue.length) { lpStatus('Seleziona almeno un contenuto.'); return; }
+    unlockVoice();
     speechSynthesis.cancel();
     lp.playing = true; lp.paused = false; lp.idx = 0;
     lp.endAt = lopts.min ? Date.now() + lopts.min * 60000 : 0;
@@ -890,6 +897,18 @@
     return '<div class="lrow"><div class="llab">' + label + '</div><div class="tagbar">' + vals.map(function (v) {
       return '<button class="tagbtn lchip' + (lopts[key] === v ? ' on' : '') + '" data-act="lopt" data-arg="' + key + ':' + v + '">' + fmt(v) + '</button>';
     }).join('') + '</div></div>';
+  }
+  function lqResults() {
+    var s = (lexq || '').toLowerCase().trim(); if (s.length < 2) return '';
+    var seen = {}, out = '';
+    buildQueue(true).forEach(function (x) {
+      if (seen[x.k]) return;
+      if (x.t.toLowerCase().indexOf(s) < 0) return;
+      seen[x.k] = 1;
+      if (Object.keys(seen).length > 15) return;
+      out += '<div class="lxrow"><span>' + esc(x.t) + '</span>' + (lexcl[x.k] ? '<em>tolta</em>' : '<button class="lmini" data-act="lex" data-arg="' + esc(x.k) + '" data-txt="' + esc(x.t) + '">🚫 Togli</button>') + '</div>';
+    });
+    return out || '<div class="lnote">Nessuna frase trovata.</div>';
   }
   function ascoltoScreen() {
     var tot = 0, nseg = 0; LG.forEach(function (g) { tot += lsel[g.id].size; });
@@ -914,6 +933,10 @@
       }
       out += '</div>';
     });
+    out += '<div class="hgroup">Togli frasi dall\'ascolto</div><div class="lnote">Cerca una frase o una parola tra i contenuti selezionati e premi 🚫 per toglierla (insieme alla sua traduzione). Durante l\'ascolto puoi anche premere «Togli questa frase».</div>' +
+      '<div class="search"><input id="lq" type="search" placeholder="es. chestnuts" autocomplete="off" value="' + esc(lexq) + '"></div><div id="lqres">' + lqResults() + '</div>';
+    var ek = Object.keys(lexcl);
+    if (ek.length) out += '<div class="hgroup">Frasi tolte (' + ek.length + ')</div>' + ek.map(function (k) { return '<div class="lxrow"><span>' + esc(lexcl[k]) + '</span><button class="lmini" data-act="lrestore" data-arg="' + esc(k) + '">Rimetti</button></div>'; }).join('') + '<button class="bigbtn alt" data-act="lrestoreall">Rimetti tutte</button>';
     out += '<div class="hgroup">File audio (per iPod, iPhone, Musica)</div><div class="lnote">Esporta la selezione come testo, poi sul Mac lancia lo script <b>Crea_audio.py</b> (nella cartella Inglese) per ottenere un file audio da copiare sul dispositivo: va avanti anche a schermo bloccato.</div>' +
       '<button class="bigbtn alt" data-act="lexport">⬇︎ Esporta selezione per audio</button><div id="lexp" class="lnote"></div></main>';
     return out;
@@ -926,6 +949,18 @@
     else if (act === 'lall') { var g = LG.filter(function (x) { return x.id === arg; })[0]; for (var i = 0; i < g.n(); i++) lsel[arg].add(i); saveLsel(); render(); }
     else if (act === 'lnone') { lsel[arg].clear(); saveLsel(); render(); }
     else if (act === 'lsel') { var p = arg.split(':'); if (lsel[p[0]].has(+p[1])) lsel[p[0]].delete(+p[1]); else lsel[p[0]].add(+p[1]); saveLsel(); }
+    else if (act === 'lex') { lexcl[arg] = el.getAttribute('data-txt') || arg; saveLexcl(); render(); }
+    else if (act === 'lrestore') { delete lexcl[arg]; saveLexcl(); render(); }
+    else if (act === 'lrestoreall') { lexcl = {}; saveLexcl(); render(); }
+    else if (act === 'lexcur') {
+      var cs = lp.queue[lp.idx]; if (!cs || !cs.k) return;
+      lexcl[cs.k] = cs.t; saveLexcl();
+      var before = lp.queue.slice(0, lp.idx).filter(function (x) { return x.k !== cs.k; }).length;
+      lp.queue = lp.queue.filter(function (x) { return x.k !== cs.k; });
+      lp.gen++; try { speechSynthesis.cancel(); } catch (e) {}
+      lp.idx = before; if (lp.idx >= lp.queue.length && !lopts.loop) { lpStop('✓ Finito.'); return; }
+      setTimeout(lpStep, 200);
+    }
     else if (act === 'lexport') {
       var q = buildQueue(), e = document.getElementById('lexp');
       if (!q.length) { if (e) e.textContent = 'Seleziona almeno un contenuto.'; return; }
