@@ -310,9 +310,25 @@
     }).join('');
   }
   function blocksText(blocks) { return JSON.stringify(blocks).replace(/[{}\[\]":,]|\b(type|rows|cols|cells|label|key|ex|sub|note|h|t|s|c)\b/g, ' ').toLowerCase(); }
-  function schemiBody(term) {
+  var schCat = load('schCat', 'Tutti');
+  var SCH_CATS = ['Tutti', 'Promemoria', 'Grammatica', 'Tempi', 'Chat', 'Viaggio', 'Esercizi'];
+  function schemaCat(title) {
+    if (/^Promemoria/.test(title)) return 'Promemoria';
+    if (/^Chat/.test(title)) return 'Chat';
+    if (/^Viaggio/.test(title)) return 'Viaggio';
+    if (/^(Esercizio|Pensare semplice)/.test(title)) return 'Esercizi';
+    if (/^(Tempi|Mappa dei tempi|Present Perfect|Passivo|Essere|Avere —|Have got|Soon to be)/.test(title)) return 'Tempi';
+    return 'Grammatica';
+  }
+  function schemiBody(term, raw) {
     var t = (term || '').toLowerCase().trim();
+    var counts = {}; (D.schemi || []).forEach(function (s) { var c = schemaCat(s.title); counts[c] = (counts[c] || 0) + 1; });
+    var chipbar = raw ? '' : '<div class="chips">' + SCH_CATS.map(function (c) {
+      var n = c === 'Tutti' ? (D.schemi || []).length : (counts[c] || 0);
+      return '<button class="chip2 ' + (schCat === c ? 'on' : '') + '" data-act="schcat" data-arg="' + c + '">' + c + ' (' + n + ')</button>';
+    }).join('') + '</div>';
     var list = (D.schemi || []).map(function (s, i) {
+      if (!raw && !t && schCat !== 'Tutti' && schemaCat(s.title) !== schCat) return '';
       if (s.blocks) {
         if (t && s.title.toLowerCase().indexOf(t) < 0 && blocksText(s.blocks).indexOf(t) < 0) return '';
         var op = t ? true : openSchemi.has(i);
@@ -341,7 +357,7 @@
         (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') +
         '</div></div>';
     }).join('');
-    return list || '<div class="empty">' + (t ? 'Nessun risultato.' : 'Nessuno schema ancora.') + '</div>';
+    return chipbar + (list || '<div class="empty">' + (t ? 'Nessun risultato.' : 'Nessuno schema ancora.') + '</div>');
   }
   function schemiScreen() {
     return listScreen('Schemi', 'Cerca una frase o un argomento…', schemiBody, true);
@@ -507,7 +523,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v88</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v89</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -553,7 +569,7 @@
     if (ww.length) out += '<div class="hgroup">Verbi irregolari (' + ww.length + ')</div>' + ww.map(function (x) { return verbRow(x.d, x.i); }).join('');
     var cc = D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' ').toLowerCase().indexOf(t) >= 0; });
     if (cc.length) out += '<div class="hgroup">Racconti (' + cc.length + ')</div>' + cc.map(function (x) { var m = x.s.title.match(/^(.*?)\s*\(/); return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(m ? m[1].trim() : x.s.title) + '</span><span class="chev">›</span></div></div>'; }).join('');
-    var sb = schemiBody(t);
+    var sb = schemiBody(t, true);
     if (sb.indexOf('class="empty"') < 0) out += '<div class="hgroup">Schemi (' + (sb.match(/class="schemecard/g) || []).length + ')</div>' + sb;
     var tm = (D.tempi || []).filter(function (x) { return JSON.stringify(x).toLowerCase().indexOf(t) >= 0; });
     if (tm.length) out += '<div class="hgroup">Tempi verbali (' + tm.length + ')</div><div class="card" data-act="go" data-arg="tempi"><div class="head"><span class="ctitle">' + esc(tm.map(function (x) { return x.tense; }).join(' · ')) + '<span class="cdesc">Apri la sezione Tempi verbali</span></span><span class="chev">›</span></div></div>';
@@ -583,8 +599,7 @@
   function render() { document.getElementById('screen').innerHTML = screenHtml(); renderTabs(); if (route.name === 'ascolto') lpStatus(); }
   function go(name, arg) { route = { name: name, arg: arg }; window.scrollTo(0, 0); render(); }
 
-  document.addEventListener('click', function (e) {
-    var el = e.target.closest('[data-act]'); if (!el) return;
+  function onAct(e, el) {
     var act = el.getAttribute('data-act'), arg = el.getAttribute('data-arg');
     if (act === 'go') go(arg);
     else if (act === 'go2') {
@@ -620,6 +635,7 @@
       saveSchemaHi();
       if (el.tagName === 'TR') el.classList.toggle('hi');
     }
+    else if (act === 'schcat') { schCat = arg; save('schCat', schCat); var qs = document.getElementById('q'); var bs = document.getElementById('body'); if (bs) bs.innerHTML = schemiBody(qs ? qs.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regtag') { regTag = arg; var qc3 = document.getElementById('q'); var bc3 = document.getElementById('body'); if (bc3) bc3.innerHTML = regoleBody(qc3 ? qc3.value : ''); window.scrollTo(0, 0); }
     else if (act === 'ruletag') {
@@ -672,6 +688,32 @@
     else if (act === 'deck') { flashDeck = arg; save('flashDeck', flashDeck); card = null; pickCard(); render(); }
     else if (act === 'compose-next') { pickCompose(); go('componi'); }
     else if (act === 'compose-del') { var a3 = load('composed', []); a3.splice(+arg, 1); save('composed', a3); render(); }
+  }
+  /* Tap immediato: su iPhone il "click" a volte arriva in ritardo o va perso (card che non si aprono al primo tocco).
+     Agiamo già al rilascio del dito (touchend) se il tocco è breve e fermo; il click successivo viene ignorato. */
+  var tp = null, lastTouchAct = 0;
+  document.addEventListener('touchstart', function (e) {
+    if (e.touches.length !== 1) { tp = null; return; }
+    var tc = e.touches[0];
+    tp = { x: tc.clientX, y: tc.clientY, t: Date.now(), el: e.target.closest ? e.target.closest('[data-act]') : null };
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!tp) return; var tc = e.touches[0];
+    if (Math.abs(tc.clientX - tp.x) > 10 || Math.abs(tc.clientY - tp.y) > 10) tp = null;
+  }, { passive: true });
+  document.addEventListener('touchend', function (e) {
+    var s = tp; tp = null;
+    if (!s || !s.el || Date.now() - s.t > 600) return;
+    var tg = e.target;
+    if (tg.closest && tg.closest('input,textarea,select,label,a')) return;
+    e.preventDefault();
+    lastTouchAct = Date.now();
+    onAct({ target: tg, stopPropagation: function () {}, preventDefault: function () {} }, s.el);
+  }, { passive: false });
+  document.addEventListener('click', function (e) {
+    if (Date.now() - lastTouchAct < 700) return;
+    var el = e.target.closest('[data-act]'); if (!el) return;
+    onAct(e, el);
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'lq') { lexq = e.target.value; var rs = document.getElementById('lqres'); if (rs) rs.innerHTML = lqResults(); return; }
