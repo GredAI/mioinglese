@@ -285,7 +285,7 @@
 
   /* ---------- schemi (tabelle di riferimento rapido) ---------- */
   var openSchemi = new Set();
-  var schemaHi = new Set(load('schemaHi', []));
+  var schemaHi = new Set(load('schemaHi', []).filter(function (k) { return !/^\d+:\d+$/.test(k); })); // chiavi vecchie (numero:riga) non più affidabili: ora titolo||riga
   function saveSchemaHi() { save('schemaHi', Array.from(schemaHi)); }
   function blocksHtml(blocks) {
     return blocks.map(function (b) {
@@ -310,8 +310,33 @@
     }).join('');
   }
   function blocksText(blocks) { return JSON.stringify(blocks).replace(/[{}\[\]":,]|\b(type|rows|cols|cells|label|key|ex|sub|note|h|t|s|c)\b/g, ' ').toLowerCase(); }
+  function hkey(s, ri) { return s.title + '||' + ri; }
+  function hiParse(k) {
+    var j = k.lastIndexOf('||'); if (j < 0) return null;
+    var title = k.slice(0, j), ri = +k.slice(j + 2), arr = D.schemi || [];
+    for (var i = 0; i < arr.length; i++) if (arr[i].title === title) return arr[i].rows && arr[i].rows[ri] ? { i: i, ri: ri } : null;
+    return null;
+  }
+  function hiCount() { var n = 0; schemaHi.forEach(function (k) { if (hiParse(k)) n++; }); return n; }
+  function hiView() {
+    var by = {};
+    schemaHi.forEach(function (k) { var p = hiParse(k); if (p) (by[p.i] = by[p.i] || []).push(p.ri); });
+    var ids = Object.keys(by).map(Number).sort(function (a, b) { return a - b; });
+    if (!ids.length) return '<div class="empty">Nessuna frase evidenziata.<br>Negli Schemi tocca una riga di una tabella: si colora di giallo e la ritrovi qui.</div>';
+    return '<div class="lnote">Tocca una riga per togliere l\'evidenziazione (sparisce quando riapri questa pagina).</div>' + ids.map(function (i) {
+      var s = D.schemi[i];
+      var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
+      var rows = by[i].sort(function (a, b) { return a - b; }).map(function (ri) {
+        return '<tr class="hi" data-act="schemarow" data-arg="' + esc(hkey(s, ri)).replace(/"/g, '&quot;') + '">' + s.rows[ri].map(function (c) {
+          var parts = String(c).split('\n'), ex = parts.length > 1 ? '<div class="cex">' + esc(parts.slice(1).join(' ')) + '</div>' : '';
+          return '<td>' + esc(parts[0]) + ex + '</td>';
+        }).join('') + '</tr>';
+      }).join('');
+      return '<div class="hgroup">' + esc(s.title) + '</div><div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>';
+    }).join('');
+  }
   var schCat = load('schCat', 'Tutti');
-  var SCH_CATS = ['Tutti', 'Promemoria', 'Grammatica', 'Tempi', 'Chat', 'Viaggio', 'Esercizi'];
+  var SCH_CATS = ['Tutti', 'Evidenziate', 'Promemoria', 'Grammatica', 'Tempi', 'Chat', 'Viaggio', 'Esercizi'];
   function schemaCat(title) {
     if (/^Promemoria/.test(title)) return 'Promemoria';
     if (/^Chat/.test(title)) return 'Chat';
@@ -324,9 +349,10 @@
     var t = (term || '').toLowerCase().trim();
     var counts = {}; (D.schemi || []).forEach(function (s) { var c = schemaCat(s.title); counts[c] = (counts[c] || 0) + 1; });
     var chipbar = raw ? '' : '<div class="chips">' + SCH_CATS.map(function (c) {
-      var n = c === 'Tutti' ? (D.schemi || []).length : (counts[c] || 0);
+      var n = c === 'Tutti' ? (D.schemi || []).length : c === 'Evidenziate' ? hiCount() : (counts[c] || 0);
       return '<button class="chip2 ' + (schCat === c ? 'on' : '') + '" data-act="schcat" data-arg="' + c + '">' + c + ' (' + n + ')</button>';
     }).join('') + '</div>';
+    if (!raw && !t && schCat === 'Evidenziate') return chipbar + hiView();
     var list = (D.schemi || []).map(function (s, i) {
       if (!raw && !t && schCat !== 'Tutti' && schemaCat(s.title) !== schCat) return '';
       if (s.blocks) {
@@ -342,8 +368,8 @@
       var rows = s.rows.map(function (r, ri) {
         if (t && !titleHit && r.join(' ').toLowerCase().indexOf(t) < 0) return '';
         shown++;
-        var key = i + ':' + ri, hi = schemaHi.has(key);
-        return '<tr class="' + (hi ? 'hi' : '') + '" data-act="schemarow" data-arg="' + key + '">' + r.map(function (c) {
+        var key = hkey(s, ri), hi = schemaHi.has(key);
+        return '<tr class="' + (hi ? 'hi' : '') + '" data-act="schemarow" data-arg="' + esc(key).replace(/"/g, '&quot;') + '">' + r.map(function (c) {
           var parts = String(c).split('\n');
           var ex = parts.length > 1 ? '<div class="cex">' + esc(parts.slice(1).join(' ')) + '</div>' : '';
           return '<td>' + esc(parts[0]) + ex + '</td>';
@@ -523,7 +549,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v90</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v91</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -537,6 +563,7 @@
     }
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
+      '<div class="tile" data-act="hi"><div class="ti">⭐</div><div class="tl">Evidenziate</div><div class="ts">' + hiCount() + ' frasi</div></div>' +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
       tile('ascolto', '🎧', 'Ascolto', 'playlist, timer, audio') +
       tile('tempi', '⏳', 'Tempi verbali', (D.tempi ? D.tempi.length : 0) + ' tempi, attivo e passivo') +
@@ -635,6 +662,7 @@
       saveSchemaHi();
       if (el.tagName === 'TR') el.classList.toggle('hi');
     }
+    else if (act === 'hi') { schCat = 'Evidenziate'; save('schCat', schCat); go('schemi'); }
     else if (act === 'schcat') { schCat = arg; save('schCat', schCat); var qs = document.getElementById('q'); var bs = document.getElementById('body'); if (bs) bs.innerHTML = schemiBody(qs ? qs.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regtag') { regTag = arg; var qc3 = document.getElementById('q'); var bc3 = document.getElementById('body'); if (bc3) bc3.innerHTML = regoleBody(qc3 ? qc3.value : ''); window.scrollTo(0, 0); }

@@ -1,7 +1,7 @@
 /* Service worker — cache per uso offline. Cambia CACHE per forzare l'aggiornamento. */
-var CACHE = 'inglese-v90';
+var CACHE = 'inglese-v91';
 var ASSETS = [
-  './', './index.html', './style.css?v=90', './app.js?v=90', './data.js?v=90',
+  './', './index.html', './style.css?v=91', './app.js?v=91', './data.js?v=91',
   './manifest.webmanifest', './icon-180.png', './icon-192.png', './icon-512.png'
 ];
 self.addEventListener('install', function (e) {
