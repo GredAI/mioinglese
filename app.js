@@ -102,6 +102,36 @@
   }
 
   /* ---------- rendering pieces ---------- */
+  /* ---------- LE MIE NOTE (aggiungi/correggi al volo, salvate sul dispositivo) ---------- */
+  var notes = load('notes', {});
+  function saveNotes() { save('notes', notes); }
+  function noteView(id) {
+    return notes[id]
+      ? '<div class="mynote" data-act="noteedit" data-arg="' + esc(id).replace(/"/g, '&quot;') + '"><b>✏️ La mia nota</b><div>' + esc(notes[id]).replace(/\n/g, '<br>') + '</div></div>'
+      : '<button class="noteadd" data-act="noteedit" data-arg="' + esc(id).replace(/"/g, '&quot;') + '">＋ Aggiungi una nota</button>';
+  }
+  function noteBlock(id) { return '<div class="notewrap" data-note="' + esc(id).replace(/"/g, '&quot;') + '">' + noteView(id) + '</div>'; }
+  function noteLabel(id) {
+    if (id.charAt(0) === 'r') { var r = D.rules.filter(function (x) { return 'r' + x.n === id; })[0]; return r ? 'Regola ' + r.n + ' — ' + r.title : id; }
+    if (id.indexOf('s:') === 0) return 'Schema — ' + id.slice(2);
+    return id;
+  }
+  function noteScreen() {
+    var ids = Object.keys(notes).filter(function (k) { return notes[k]; });
+    var out = topBar('Le mie note', 'home') + '<main class="fade" id="body">' +
+      '<div class="lnote">Le note le scrivi dentro le regole e gli schemi (＋ Aggiungi una nota, in fondo alla card). Qui le ritrovi tutte. Sono salvate su questo dispositivo: per portarle nell\'app definitiva per tutti i dispositivi, esporta il file e mandamelo.</div>';
+    if (!ids.length) out += '<div class="empty">Nessuna nota ancora.</div>';
+    ids.forEach(function (id) { out += '<div class="hgroup">' + esc(noteLabel(id)) + '</div>' + noteBlock(id); });
+    if (ids.length) out += '<button class="bigbtn alt" data-act="noteexport">⬇︎ Esporta note</button>';
+    return out + '</main>';
+  }
+  function noteEdit(id, wrap) {
+    wrap.innerHTML = '<textarea class="notearea" id="notetxt" rows="4" placeholder="Scrivi la tua nota…">' + esc(notes[id] || '') + '</textarea>' +
+      '<div class="lnav"><button class="lmini" data-act="notesave" data-arg="' + esc(id).replace(/"/g, '&quot;') + '">Salva</button>' +
+      '<button class="lmini" data-act="notecancel" data-arg="' + esc(id).replace(/"/g, '&quot;') + '">Annulla</button>' +
+      (notes[id] ? '<button class="lmini" data-act="notedel" data-arg="' + esc(id).replace(/"/g, '&quot;') + '">Elimina</button>' : '') + '</div>';
+    var ta = document.getElementById('notetxt'); if (ta) ta.focus();
+  }
   function ruleCard(r, open) {
     var vis = r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; });
     var desc = (vis[0] && vis[0].s ? vis[0].s.replace(/\*\*|\[\[|\]\]/g, '') : '');
@@ -121,7 +151,7 @@
       '<div class="head" data-act="rule" data-arg="' + r.n + '"><span class="num">' + r.n + '</span>' +
       '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc">' + esc(desc.slice(0, 70)) + (desc.length > 70 ? '…' : '') + '</span>') + '</span>' +
       dot + favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
-      '<div class="body"><div class="body-in">' + tagbar + body + '</div></div></div>';
+      '<div class="body"><div class="body-in">' + tagbar + body + noteBlock('r' + r.n) + '</div></div></div>';
   }
   function vocRow(v, i) {
     return '<div class="row">' + speakBtn(v.en.replace(/\(.*?\)/g, '')) +
@@ -165,6 +195,7 @@
     if (route.name === 'schemi') return schemiScreen();
     if (route.name === 'tempi') return tempiScreen();
     if (route.name === 'ascolto') return ascoltoScreen();
+    if (route.name === 'note') return noteScreen();
     if (route.name === 'racc') return raccDetail(route.arg);
     if (route.name === 'preferiti') return preferitiScreen();
     if (route.name === 'componi') return componiScreen();
@@ -360,7 +391,7 @@
         var op = t ? true : openSchemi.has(i);
         return '<div class="schemecard' + (op ? ' open' : '') + '" data-schema="' + i + '">' +
           '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
-          '<div class="sbody"><div class="vwrap">' + blocksHtml(s.blocks) + '</div>' + (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + '</div></div>';
+          '<div class="sbody"><div class="vwrap">' + blocksHtml(s.blocks) + '</div>' + (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + noteBlock('s:' + s.title) + '</div></div>';
       }
       var titleHit = t && s.title.toLowerCase().indexOf(t) >= 0;
       var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
@@ -380,7 +411,7 @@
       return '<div class="schemecard' + (open ? ' open' : '') + '" data-schema="' + i + '">' +
         '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
         '<div class="sbody"><div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
-        (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') +
+        (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + noteBlock('s:' + s.title) +
         '</div></div>';
     }).join('');
     return chipbar + (list || '<div class="empty">' + (t ? 'Nessun risultato.' : 'Nessuno schema ancora.') + '</div>');
@@ -549,7 +580,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v91</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v92</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -563,6 +594,7 @@
     }
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
+      tile('note', '📝', 'Le mie note', Object.keys(notes).filter(function (k) { return notes[k]; }).length + ' note') +
       '<div class="tile" data-act="hi"><div class="ti">⭐</div><div class="tl">Evidenziate</div><div class="ts">' + hiCount() + ' frasi</div></div>' +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
       tile('ascolto', '🎧', 'Ascolto', 'playlist, timer, audio') +
@@ -598,6 +630,8 @@
     if (cc.length) out += '<div class="hgroup">Racconti (' + cc.length + ')</div>' + cc.map(function (x) { var m = x.s.title.match(/^(.*?)\s*\(/); return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(m ? m[1].trim() : x.s.title) + '</span><span class="chev">›</span></div></div>'; }).join('');
     var sb = schemiBody(t, true);
     if (sb.indexOf('class="empty"') < 0) out += '<div class="hgroup">Schemi (' + (sb.match(/class="schemecard/g) || []).length + ')</div>' + sb;
+    var nn = Object.keys(notes).filter(function (k) { return notes[k] && (notes[k] + ' ' + noteLabel(k)).toLowerCase().indexOf(t) >= 0; });
+    if (nn.length) out += '<div class="hgroup">Le mie note (' + nn.length + ')</div>' + nn.map(function (k) { return '<div class="hgroup" style="font-size:12px">' + esc(noteLabel(k)) + '</div>' + noteBlock(k); }).join('');
     var tm = (D.tempi || []).filter(function (x) { return JSON.stringify(x).toLowerCase().indexOf(t) >= 0; });
     if (tm.length) out += '<div class="hgroup">Tempi verbali (' + tm.length + ')</div><div class="card" data-act="go" data-arg="tempi"><div class="head"><span class="ctitle">' + esc(tm.map(function (x) { return x.tense; }).join(' · ')) + '<span class="cdesc">Apri la sezione Tempi verbali</span></span><span class="chev">›</span></div></div>';
     var cz = (D.canzoni || []).filter(function (x) { return JSON.stringify(x).toLowerCase().indexOf(t) >= 0; });
@@ -661,6 +695,18 @@
       if (schemaHi.has(arg)) schemaHi.delete(arg); else schemaHi.add(arg);
       saveSchemaHi();
       if (el.tagName === 'TR') el.classList.toggle('hi');
+    }
+    else if (act === 'noteedit') { var nw = el.closest('.notewrap'); if (nw) noteEdit(arg, nw); }
+    else if (act === 'notesave') {
+      var nta = document.getElementById('notetxt'), nv = nta ? nta.value.trim() : '';
+      if (nv) notes[arg] = nv; else delete notes[arg];
+      saveNotes(); var nw2 = el.closest('.notewrap'); if (nw2) nw2.innerHTML = noteView(arg);
+    }
+    else if (act === 'notecancel') { var nw3 = el.closest('.notewrap'); if (nw3) nw3.innerHTML = noteView(arg); }
+    else if (act === 'notedel') { delete notes[arg]; saveNotes(); var nw4 = el.closest('.notewrap'); if (nw4) nw4.innerHTML = noteView(arg); }
+    else if (act === 'noteexport') {
+      var exp = Object.keys(notes).filter(function (k) { return notes[k]; }).map(function (k) { return { id: k, dove: noteLabel(k), nota: notes[k] }; });
+      try { var na = document.createElement('a'); na.href = URL.createObjectURL(new Blob([JSON.stringify(exp, null, 1)], { type: 'application/json' })); na.download = 'note.json'; document.body.appendChild(na); na.click(); na.remove(); } catch (er) {}
     }
     else if (act === 'hi') { schCat = 'Evidenziate'; save('schCat', schCat); go('schemi'); }
     else if (act === 'schcat') { schCat = arg; save('schCat', schCat); var qs = document.getElementById('q'); var bs = document.getElementById('body'); if (bs) bs.innerHTML = schemiBody(qs ? qs.value : ''); window.scrollTo(0, 0); }
