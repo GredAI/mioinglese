@@ -367,10 +367,12 @@
     }).join('');
   }
   var schCat = load('schCat', 'Tutti');
-  var SCH_CATS = ['Tutti', 'Evidenziate', 'Promemoria', 'Grammatica', 'Tempi', 'Chat', 'Viaggio', 'Esercizi'];
+  var SCH_CATS = ['Tutti', 'Evidenziate', 'Promemoria', 'Grammatica', 'Tempi', 'Conversazione', 'Viaggio', 'Esercizi', 'Archivio chat'];
+  if (SCH_CATS.indexOf(schCat) < 0) schCat = 'Tutti';
   function schemaCat(title) {
     if (/^Promemoria/.test(title)) return 'Promemoria';
-    if (/^Chat/.test(title)) return 'Chat';
+    if (/^Conversazione/.test(title)) return 'Conversazione';
+    if (/^Chat/.test(title)) return 'Archivio chat';
     if (/^Viaggio/.test(title)) return 'Viaggio';
     if (/^(Esercizio|Pensare semplice)/.test(title)) return 'Esercizi';
     if (/^(Tempi|Mappa dei tempi|Present Perfect|Passivo|Essere|Avere —|Have got|Soon to be)/.test(title)) return 'Tempi';
@@ -580,7 +582,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v92</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v93</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
