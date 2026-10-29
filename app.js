@@ -667,7 +667,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v100</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v101</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -696,7 +696,10 @@
       tile('canzoni', '🎵', 'Canzoni', D.canzoni.length + ' brani') +
       tile('racconti', '📖', 'Racconti', D.racconti.length + ' testi') +
       tile('preferiti', '⭐', 'Preferiti', fav.size + ' salvati') +
-      '</div>';
+      '</div>' +
+      '<div class="hgroup">Copia dei miei dati</div><button class="bigbtn alt" data-act="bakexp">⬇︎ Salva tutto (discorsi, note, evidenziate…)</button>' +
+      '<label class="bigbtn alt implabel">⬆︎ Ripristina da un file<input type="file" accept=".json,application/json" id="bakimp" hidden></label>' +
+      '<div class="lnote">«Salva tutto» crea un solo file con tutto ciò che hai fatto nell\'app. «Ripristina» lo rimette su qualunque dispositivo, senza cancellare ciò che c\'è già.</div>';
     return out;
   }
   function tile(id, ic, label, sub) {
@@ -819,6 +822,10 @@
     else if (act === 'scrsave') { var q5 = arg.split(':'), it5 = scripts[+q5[0]].items[+q5[1]]; it5.en = document.getElementById('sced1').value.trim() || it5.en; it5.it = document.getElementById('sced2').value.trim(); saveScripts(); render(); }
     else if (act === 'scrcancel') render();
     else if (act === 'scrdedup') { var sd = scripts[+arg], sn = {}; sd.items = sd.items.filter(function (x) { var k = x.en.trim().toLowerCase(); if (sn[k]) return false; sn[k] = 1; return true; }); saveScripts(); render(); toast('Frasi ripetute tolte'); }
+    else if (act === 'bakexp') {
+      var bk = {}; try { for (var bi = 0; bi < localStorage.length; bi++) { var bkk = localStorage.key(bi); bk[bkk] = JSON.parse(localStorage.getItem(bkk)); } } catch (er) {}
+      try { var ba = document.createElement('a'); ba.href = URL.createObjectURL(new Blob([JSON.stringify({ app: 'mioinglese', data: bk }, null, 1)], { type: 'application/json' })); ba.download = 'il-mio-inglese-backup.json'; document.body.appendChild(ba); ba.click(); ba.remove(); toast('Backup salvato'); } catch (er) {}
+    }
     else if (act === 'screxport') {
       try { var ea = document.createElement('a'); ea.href = URL.createObjectURL(new Blob([JSON.stringify(scripts, null, 1)], { type: 'application/json' })); ea.download = 'discorsi.json'; document.body.appendChild(ea); ea.click(); ea.remove(); } catch (er) {}
     }
@@ -916,12 +923,38 @@
     onAct(e, el);
   });
   document.addEventListener('change', function (e) {
-    var id = e.target && e.target.id; if (id !== 'scrimp' && id !== 'noteimp') return;
+    var id = e.target && e.target.id; if (id !== 'scrimp' && id !== 'noteimp' && id !== 'bakimp') return;
     var f = e.target.files && e.target.files[0]; if (!f) return;
     var rd = new FileReader();
     rd.onload = function () {
       try {
         var arr = JSON.parse(rd.result), n = 0;
+        if (id === 'bakimp') {
+          var bd = arr && arr.data; if (!bd || arr.app !== 'mioinglese') { toast('File non valido'); return; }
+          var gl = function (k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (x) { return d; } };
+          var sl = function (k, v) { localStorage.setItem(k, JSON.stringify(v)); };
+          Object.keys(bd).forEach(function (k) {
+            var inc = bd[k], cur = gl(k, null);
+            if (cur == null) { sl(k, inc); n++; return; }
+            if (k === 'scripts' && Array.isArray(inc)) {
+              inc.forEach(function (d) { var c = cur.filter(function (x) { return x.id === d.id || x.name === d.name; })[0];
+                if (!c) { cur.push(d); n += d.items.length; } else d.items.forEach(function (it) { if (!scrHas(c, it.en)) { c.items.push(it); n++; } }); });
+              sl(k, cur);
+            } else if (k === 'composed' && Array.isArray(inc)) {
+              inc.forEach(function (c) { if (!cur.some(function (x) { return x.p === c.p; })) { cur.push(c); n++; } }); sl(k, cur);
+            } else if (Array.isArray(inc) && Array.isArray(cur)) {
+              inc.forEach(function (v) { if (cur.indexOf(v) < 0) { cur.push(v); n++; } }); sl(k, cur);
+            } else if (inc && cur && typeof inc === 'object' && typeof cur === 'object') {
+              Object.keys(inc).forEach(function (kk) {
+                if (cur[kk] == null || cur[kk] === '') { cur[kk] = inc[kk]; n++; }
+                else if (Array.isArray(inc[kk]) && Array.isArray(cur[kk])) inc[kk].forEach(function (v) { if (cur[kk].indexOf(v) < 0) { cur[kk].push(v); n++; } });
+              }); sl(k, cur);
+            }
+          });
+          toast(n ? 'Ripristinate ' + n + ' voci' : 'Niente di nuovo da ripristinare');
+          setTimeout(function () { location.reload(); }, 900);
+          return;
+        }
         if (id === 'scrimp') {
           arr.forEach(function (d) {
             if (!d || !d.items) return;
