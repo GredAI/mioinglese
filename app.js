@@ -164,6 +164,7 @@
     });
     out += '<button class="bigbtn alt" data-act="scrnew2">＋ Nuovo discorso</button>';
     if (scripts.length) out += '<button class="bigbtn alt" data-act="screxport">⬇︎ Esporta discorsi</button>';
+    out += '<label class="bigbtn alt implabel">⬆︎ Importa discorsi da un file<input type="file" accept=".json,application/json" id="scrimp" hidden></label><div class="lnote">Per portare i discorsi da un altro dispositivo: là premi «Esporta discorsi» (file discorsi.json), poi qui «Importa». I discorsi che hai già non vengono toccati: si aggiungono solo quelli nuovi o le frasi mancanti.</div>';
     return out + '</main>';
   }
   var scrShowIt = load('scrShowIt', true);
@@ -203,6 +204,7 @@
     if (!ids.length) out += '<div class="empty">Nessuna nota ancora.</div>';
     ids.forEach(function (id) { out += '<div class="hgroup">' + esc(noteLabel(id)) + '</div>' + noteBlock(id); });
     if (ids.length) out += '<button class="bigbtn alt" data-act="noteexport">⬇︎ Esporta note</button>';
+    out += '<label class="bigbtn alt implabel">⬆︎ Importa note da un file<input type="file" accept=".json,application/json" id="noteimp" hidden></label>';
     return out + '</main>';
   }
   function noteEdit(id, wrap) {
@@ -665,7 +667,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v99</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v100</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -912,6 +914,30 @@
     if (Date.now() - lastTouchAct < 700) return;
     var el = e.target.closest('[data-act]'); if (!el) return;
     onAct(e, el);
+  });
+  document.addEventListener('change', function (e) {
+    var id = e.target && e.target.id; if (id !== 'scrimp' && id !== 'noteimp') return;
+    var f = e.target.files && e.target.files[0]; if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      try {
+        var arr = JSON.parse(rd.result), n = 0;
+        if (id === 'scrimp') {
+          arr.forEach(function (d) {
+            if (!d || !d.items) return;
+            var cur = scripts.filter(function (x) { return x.id === d.id || x.name === d.name; })[0];
+            if (!cur) { scripts.push({ id: d.id || scrId(), name: d.name || 'Discorso', items: d.items.slice() }); n += d.items.length; }
+            else d.items.forEach(function (it) { if (!scrHas(cur, it.en)) { cur.items.push({ en: it.en, it: it.it }); n++; } });
+          });
+          saveScripts();
+        } else {
+          arr.forEach(function (x) { if (x && x.id && x.nota && !notes[x.id]) { notes[x.id] = x.nota; n++; } });
+          saveNotes();
+        }
+        render(); toast(n ? 'Importate ' + n + ' voci' : 'Niente di nuovo da importare');
+      } catch (er) { toast('File non valido'); }
+    };
+    rd.readAsText(f);
   });
   document.addEventListener('input', function (e) {
     if (e.target.id === 'lq') { lexq = e.target.value; var rs = document.getElementById('lqres'); if (rs) rs.innerHTML = lqResults(); return; }
