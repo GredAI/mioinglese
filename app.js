@@ -102,6 +102,64 @@
   }
 
   /* ---------- rendering pieces ---------- */
+  /* ---------- I MIEI DISCORSI (collage di frasi, salvato sul dispositivo) ---------- */
+  var scripts = load('scripts', []);
+  function saveScripts() { save('scripts', scripts); }
+  function scrId() { return 'd' + Date.now().toString(36) + Math.floor(Math.random() * 99); }
+  function toast(msg) {
+    var el = document.createElement('div'); el.className = 'toast'; el.textContent = msg; document.body.appendChild(el);
+    setTimeout(function () { el.classList.add('out'); setTimeout(function () { el.remove(); }, 400); }, 1700);
+  }
+  function rowToItem(s, r) {
+    var en = '', it = '';
+    r.forEach(function (c) {
+      var f = String(c).split('\n')[0].trim(); if (!f) return;
+      var l = langOf(f);
+      if (l === 'en' && !en) en = f; else if (l === 'it' && !it) it = f;
+    });
+    if (!en) en = String(r[0]).split('\n')[0];
+    return { en: en, it: it };
+  }
+  function closeSheet() { var s = document.getElementById('scrsheet'); if (s) s.remove(); }
+  function openSheet(item) {
+    closeSheet();
+    var sh = document.createElement('div'); sh.id = 'scrsheet'; sh.className = 'sheetbg'; sh.setAttribute('data-act', 'scrclose');
+    sh._item = item;
+    sh.innerHTML = '<div class="sheet"><div class="sheett">Aggiungi a quale discorso?</div><div class="sheetp">' + esc(item.en) + '</div>' +
+      scripts.map(function (d, i) { return '<button class="sheetb" data-act="scrpick" data-arg="' + i + '">' + esc(d.name) + ' <small>(' + d.items.length + ' frasi)</small></button>'; }).join('') +
+      '<button class="sheetb new" data-act="scrnew">＋ Nuovo discorso…</button><button class="sheetb cancel" data-act="scrclose">Annulla</button></div>';
+    document.body.appendChild(sh);
+  }
+  function scrAdd(i, item) {
+    if (!scripts[i]) return;
+    scripts[i].items.push({ en: item.en, it: item.it }); saveScripts();
+    toast('Aggiunta a «' + scripts[i].name + '»');
+  }
+  function scrListScreen() {
+    var out = topBar('I miei discorsi', 'home') + '<main class="fade" id="body">' +
+      '<div class="lnote">Un discorso è un collage di frasi messe nell\'ordine che vuoi. Come si crea: negli <b>Schemi</b>, a destra di ogni riga, tocca <b>＋</b> e scegli il discorso (o creane uno nuovo). Qui lo riordini, correggi, ascolti e copi.</div>';
+    if (!scripts.length) out += '<div class="empty">Nessun discorso ancora.</div>';
+    scripts.forEach(function (d, i) {
+      out += '<div class="card" data-act="scropen" data-arg="' + d.id + '"><div class="head"><span class="ctitle">' + esc(d.name) + '<span class="cdesc">' + d.items.length + ' frasi</span></span><span class="chev">›</span></div></div>';
+    });
+    out += '<button class="bigbtn alt" data-act="scrnew2">＋ Nuovo discorso</button>';
+    if (scripts.length) out += '<button class="bigbtn alt" data-act="screxport">⬇︎ Esporta discorsi</button>';
+    return out + '</main>';
+  }
+  var scrShowIt = load('scrShowIt', true);
+  function scrScreen(id) {
+    var i = scripts.map(function (d) { return d.id; }).indexOf(id), d = scripts[i];
+    if (!d) return scrListScreen();
+    var out = topBar(d.name, 'discorsi') + '<main class="fade" id="body">' +
+      '<div class="lnav"><button class="lmini" data-act="scrplay" data-arg="' + i + '">▶︎ Ascolta</button><button class="lmini" data-act="scrcopy" data-arg="' + i + '">Copia testo</button></div>' +
+      '<div class="lnav"><button class="lmini" data-act="scrtr">' + (scrShowIt ? 'Nascondi traduzione' : 'Mostra traduzione') + '</button><button class="lmini" data-act="scrren" data-arg="' + i + '">Rinomina</button><button class="lmini" data-act="scrdel" data-arg="' + i + '">Elimina</button></div>';
+    if (!d.items.length) out += '<div class="empty">Vuoto. Negli Schemi tocca ＋ accanto a una frase per aggiungerla qui.</div>';
+    d.items.forEach(function (it, k) {
+      out += '<div class="scritem" id="si' + k + '"><div class="scrn">' + (k + 1) + '</div><div class="scrt"><div class="scren">' + esc(it.en) + '</div>' + (scrShowIt && it.it ? '<div class="scrit">' + esc(it.it) + '</div>' : '') + '</div>' +
+        '<div class="scrb"><button class="lmini" data-act="scrspk" data-arg="' + i + ':' + k + '">🔊</button><button class="lmini" data-act="scrup" data-arg="' + i + ':' + k + '">▲</button><button class="lmini" data-act="scrdn" data-arg="' + i + ':' + k + '">▼</button><button class="lmini" data-act="scred" data-arg="' + i + ':' + k + '">✏️</button><button class="lmini" data-act="scrrm" data-arg="' + i + ':' + k + '">🗑</button></div></div>';
+    });
+    return out + '</main>';
+  }
   /* ---------- LE MIE NOTE (aggiungi/correggi al volo, salvate sul dispositivo) ---------- */
   var notes = load('notes', {});
   function saveNotes() { save('notes', notes); }
@@ -196,6 +254,8 @@
     if (route.name === 'tempi') return tempiScreen();
     if (route.name === 'ascolto') return ascoltoScreen();
     if (route.name === 'note') return noteScreen();
+    if (route.name === 'discorsi') return scrListScreen();
+    if (route.name === 'discorso') return scrScreen(route.arg);
     if (route.name === 'racc') return raccDetail(route.arg);
     if (route.name === 'preferiti') return preferitiScreen();
     if (route.name === 'componi') return componiScreen();
@@ -396,7 +456,7 @@
           '<div class="sbody"><div class="vwrap">' + blocksHtml(s.blocks) + '</div>' + (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + noteBlock('s:' + s.title) + '</div></div>';
       }
       var titleHit = t && s.title.toLowerCase().indexOf(t) >= 0;
-      var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
+      var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '<th class="scrth"></th></tr>';
       var shown = 0;
       var rows = s.rows.map(function (r, ri) {
         if (t && !titleHit && r.join(' ').toLowerCase().indexOf(t) < 0) return '';
@@ -406,7 +466,7 @@
           var parts = String(c).split('\n');
           var ex = parts.length > 1 ? '<div class="cex">' + esc(parts.slice(1).join(' ')) + '</div>' : '';
           return '<td>' + esc(parts[0]) + ex + '</td>';
-        }).join('') + '</tr>';
+        }).join('') + '<td class="scrtd"><button class="scradd" data-act="scradd" data-arg="' + esc(key).replace(/"/g, '&quot;') + '" aria-label="Aggiungi a un discorso">＋</button></td></tr>';
       }).join('');
       if (t && !shown && !(s.note && s.note.toLowerCase().indexOf(t) >= 0)) return '';
       var open = t ? true : openSchemi.has(i); // durante la ricerca le card trovate si aprono da sole
@@ -582,7 +642,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v93</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v94</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -596,6 +656,7 @@
     }
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
+      tile('discorsi', '🗣', 'I miei discorsi', scripts.length + ' discorsi') +
       tile('note', '📝', 'Le mie note', Object.keys(notes).filter(function (k) { return notes[k]; }).length + ' note') +
       '<div class="tile" data-act="hi"><div class="ti">⭐</div><div class="tl">Evidenziate</div><div class="ts">' + hiCount() + ' frasi</div></div>' +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
@@ -697,6 +758,44 @@
       if (schemaHi.has(arg)) schemaHi.delete(arg); else schemaHi.add(arg);
       saveSchemaHi();
       if (el.tagName === 'TR') el.classList.toggle('hi');
+    }
+    else if (act === 'scradd') {
+      var pp = hiParse(arg); if (!pp) return;
+      var item = rowToItem(D.schemi[pp.i], D.schemi[pp.i].rows[pp.ri]);
+      if (!scripts.length) { var nm = window.prompt('Nome del nuovo discorso (es. Presentazione)', 'Presentazione'); if (!nm) return; scripts.push({ id: scrId(), name: nm.trim(), items: [] }); saveScripts(); scrAdd(0, item); }
+      else openSheet(item);
+    }
+    else if (act === 'scrpick') { var sh = document.getElementById('scrsheet'); if (sh && sh._item) scrAdd(+arg, sh._item); closeSheet(); }
+    else if (act === 'scrnew') { var sh2 = document.getElementById('scrsheet'), it2 = sh2 && sh2._item; var nm2 = window.prompt('Nome del nuovo discorso', ''); if (!nm2) return; scripts.push({ id: scrId(), name: nm2.trim(), items: [] }); saveScripts(); if (it2) scrAdd(scripts.length - 1, it2); closeSheet(); }
+    else if (act === 'scrclose') { if (e.target && (e.target.id === 'scrsheet' || (e.target.closest && e.target.closest('.cancel')))) closeSheet(); }
+    else if (act === 'scrnew2') { var nm3 = window.prompt('Nome del nuovo discorso', ''); if (!nm3) return; scripts.push({ id: scrId(), name: nm3.trim(), items: [] }); saveScripts(); render(); }
+    else if (act === 'scropen') go('discorso', arg);
+    else if (act === 'scrtr') { scrShowIt = !scrShowIt; save('scrShowIt', scrShowIt); render(); }
+    else if (act === 'scrren') { var d1 = scripts[+arg], n1 = window.prompt('Nuovo nome', d1.name); if (n1) { d1.name = n1.trim(); saveScripts(); render(); } }
+    else if (act === 'scrdel') { if (window.confirm('Eliminare il discorso «' + scripts[+arg].name + '»?')) { scripts.splice(+arg, 1); saveScripts(); go('discorsi'); } }
+    else if (act === 'scrcopy') {
+      var txt = scripts[+arg].items.map(function (x) { return x.en; }).join('\n');
+      try { navigator.clipboard.writeText(txt).then(function () { toast('Testo copiato'); }); } catch (er) { toast('Copia non disponibile'); }
+    }
+    else if (act === 'scrplay') {
+      LG.forEach(function (g) { lsel[g.id].clear(); }); lsel.discorsi.add(+arg); saveLsel();
+      go('ascolto'); lpStart();
+    }
+    else if (act === 'scrspk') { var q1 = arg.split(':'); speak(scripts[+q1[0]].items[+q1[1]].en); }
+    else if (act === 'scrup' || act === 'scrdn') {
+      var q2 = arg.split(':'), a1 = scripts[+q2[0]].items, k1 = +q2[1], k2 = act === 'scrup' ? k1 - 1 : k1 + 1;
+      if (k2 >= 0 && k2 < a1.length) { var tmp = a1[k1]; a1[k1] = a1[k2]; a1[k2] = tmp; saveScripts(); render(); }
+    }
+    else if (act === 'scrrm') { var q3 = arg.split(':'); scripts[+q3[0]].items.splice(+q3[1], 1); saveScripts(); render(); }
+    else if (act === 'scred') {
+      var q4 = arg.split(':'), it4 = scripts[+q4[0]].items[+q4[1]], row = document.getElementById('si' + q4[1]);
+      if (row) row.innerHTML = '<div class="scrt" style="width:100%"><textarea class="notearea" id="sced1" rows="3">' + esc(it4.en) + '</textarea><textarea class="notearea" id="sced2" rows="2" placeholder="Traduzione (facoltativa)">' + esc(it4.it || '') + '</textarea>' +
+        '<div class="lnav"><button class="lmini" data-act="scrsave" data-arg="' + arg + '">Salva</button><button class="lmini" data-act="scrcancel">Annulla</button></div></div>';
+    }
+    else if (act === 'scrsave') { var q5 = arg.split(':'), it5 = scripts[+q5[0]].items[+q5[1]]; it5.en = document.getElementById('sced1').value.trim() || it5.en; it5.it = document.getElementById('sced2').value.trim(); saveScripts(); render(); }
+    else if (act === 'scrcancel') render();
+    else if (act === 'screxport') {
+      try { var ea = document.createElement('a'); ea.href = URL.createObjectURL(new Blob([JSON.stringify(scripts, null, 1)], { type: 'application/json' })); ea.download = 'discorsi.json'; document.body.appendChild(ea); ea.click(); ea.remove(); } catch (er) {}
     }
     else if (act === 'noteedit') { var nw = el.closest('.notewrap'); if (nw) noteEdit(arg, nw); }
     else if (act === 'notesave') {
@@ -835,6 +934,7 @@
     { id: 'tempi', label: 'Tempi verbali', n: function () { return (D.tempi || []).length; }, name: function (i) { return D.tempi[i].tense; } },
     { id: 'vocab', label: 'Vocabolario', n: function () { return D.vocab.length; }, name: function (i) { return D.vocab[i].en + ' — ' + D.vocab[i].it; } },
     { id: 'frasi', label: 'Modi di dire', n: function () { return D.idiomi.length; }, name: function (i) { return D.idiomi[i].en; } },
+    { id: 'discorsi', label: 'I miei discorsi', n: function () { return scripts.length; }, name: function (i) { return scripts[i].name; } },
     { id: 'phrasal', label: 'Phrasal verbs', n: function () { return (D.phrasal || []).length; }, name: function (i) { return D.phrasal[i].pv; } }
   ];
   var lsel = {}, lopen = {}, lexcl = load('listenExcl', {}), lexq = '';
@@ -941,6 +1041,7 @@
       });
     } else if (g === 'vocab') { var v = D.vocab[i]; pushL(a, 'en', v.en.replace(/\(.*?\)/g, '')); pushL(a, 'it', v.it.replace(/\(.*?\)/g, '')); }
     else if (g === 'frasi') { var d = D.idiomi[i]; pushL(a, 'en', d.en); pushL(a, 'it', d.it.replace(/\(.*?\)/g, '')); pushL(a, 'en', d.extra); }
+    else if (g === 'discorsi') { var sc = scripts[i]; (sc ? sc.items : []).forEach(function (it, ii) { curKey = 'discorsi:' + i + ':' + ii; if (it.en) pushL(a, 'en', it.en); if (it.it) pushL(a, 'it', it.it); }); }
     else if (g === 'phrasal') { var p = D.phrasal[i]; pushL(a, 'en', p.pv); pushL(a, 'it', p.it); pushL(a, 'en', p.ex); }
     return a;
   }
