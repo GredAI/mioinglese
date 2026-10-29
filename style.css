@@ -278,3 +278,5 @@ mark.pos{background:#ffe066;color:#1c1c1e;font-weight:700;border-radius:4px;padd
 .scrb .lmini{padding:6px 8px;min-height:36px;font-size:14px;}
 
 .scrbulk{display:block;width:100%;margin:8px 0 2px;}
+
+.implabel{display:block;text-align:center;cursor:pointer;}
