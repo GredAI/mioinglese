@@ -258,3 +258,21 @@ mark.pos{background:#ffe066;color:#1c1c1e;font-weight:700;border-radius:4px;padd
 .mynote{background:#fff7d6;border-radius:12px;padding:10px 12px;font-size:14px;line-height:1.4;cursor:pointer;}
 .mynote b{display:block;font-size:12px;color:#7a6200;margin-bottom:3px;}
 .notearea{width:100%;border:1.5px solid var(--line);border-radius:12px;padding:10px;font-size:16px;font-family:inherit;resize:vertical;margin-bottom:8px;}
+
+.scrth,.scrtd{width:44px;text-align:center;padding:4px;}
+.scradd{width:34px;height:34px;border-radius:50%;border:none;background:var(--accent-soft);color:var(--accent);font-size:20px;font-weight:700;cursor:pointer;line-height:1;}
+.sheetbg{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:50;display:flex;align-items:flex-end;}
+.sheet{background:var(--card);width:100%;border-radius:18px 18px 0 0;padding:16px;max-height:80vh;overflow-y:auto;}
+.sheett{font-weight:700;font-size:16px;margin-bottom:4px;}
+.sheetp{font-size:13px;color:var(--muted);margin-bottom:10px;max-height:60px;overflow:hidden;}
+.sheetb{display:block;width:100%;text-align:left;border:1px solid var(--line);background:#f7f7fa;border-radius:12px;padding:14px;margin:6px 0;font-size:15px;font-weight:600;cursor:pointer;}
+.sheetb.new{color:var(--accent);} .sheetb.cancel{text-align:center;color:var(--muted);}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#1c1c1e;color:#fff;padding:10px 16px;border-radius:999px;font-size:14px;z-index:60;transition:opacity .4s;}
+.toast.out{opacity:0;}
+.scritem{display:flex;gap:10px;align-items:flex-start;background:var(--card);border-radius:12px;padding:10px;margin:8px 0;}
+.scrn{flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent-soft);color:var(--accent);font-weight:700;font-size:13px;display:flex;align-items:center;justify-content:center;}
+.scrt{flex:1;min-width:0;}
+.scren{font-size:15px;font-weight:600;line-height:1.35;}
+.scrit{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.35;}
+.scrb{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:112px;}
+.scrb .lmini{padding:6px 8px;min-height:36px;font-size:14px;}
