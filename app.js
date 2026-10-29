@@ -128,16 +128,19 @@
     var sh = document.createElement('div'); sh.id = 'scrsheet'; sh.className = 'sheetbg'; sh.setAttribute('data-act', 'scrclose');
     sh._items = items;
     sh.innerHTML = '<div class="sheet"><div class="sheett">Aggiungi a quale discorso?</div><div class="sheetp">' + (items.length > 1 ? items.length + ' frasi: ' : '') + esc(item.en) + '</div>' +
-      scripts.map(function (d, i) { return '<button class="sheetb" data-act="scrpick" data-arg="' + i + '">' + esc(d.name) + ' <small>(' + d.items.length + ' frasi)</small></button>'; }).join('') +
+      scripts.map(function (d, i) { var here = items.length === 1 && scrHas(d, items[0].en); return '<button class="sheetb" data-act="scrpick" data-arg="' + i + '">' + esc(d.name) + ' <small>(' + d.items.length + ' frasi' + (here ? ' · ✓ già presente' : '') + ')</small></button>'; }).join('') +
       '<button class="sheetb new" data-act="scrnew">＋ Nuovo discorso…</button><button class="sheetb cancel" data-act="scrclose">Annulla</button></div>';
     document.body.appendChild(sh);
   }
+  function scrHas(sc, en) { return sc.items.some(function (x) { return x.en.trim().toLowerCase() === en.trim().toLowerCase(); }); }
   function scrAdd(i, items) {
     if (!scripts[i]) return;
     if (!Array.isArray(items)) items = [items];
-    items.forEach(function (item) { scripts[i].items.push({ en: item.en, it: item.it }); });
+    var added = 0, skipped = 0;
+    items.forEach(function (item) { if (scrHas(scripts[i], item.en)) skipped++; else { scripts[i].items.push({ en: item.en, it: item.it }); added++; } });
     saveScripts();
-    toast((items.length > 1 ? items.length + ' frasi aggiunte' : 'Frase aggiunta') + ' a «' + scripts[i].name + '»');
+    var nm = '«' + scripts[i].name + '»';
+    toast(!added ? (items.length > 1 ? 'Già presenti in ' : 'Già presente in ') + nm : (added > 1 ? added + ' frasi aggiunte' : 'Frase aggiunta') + ' a ' + nm + (skipped ? ' (' + skipped + ' già present' + (skipped > 1 ? 'i' : 'e') + ')' : ''));
   }
   function hiItems(cardIdx) {
     var out = [];
@@ -170,6 +173,8 @@
     var out = topBar(d.name, 'discorsi') + '<main class="fade" id="body">' +
       '<div class="lnav"><button class="lmini" data-act="scrplay" data-arg="' + i + '">▶︎ Ascolta</button><button class="lmini" data-act="scrcopy" data-arg="' + i + '">Copia testo</button></div>' +
       '<div class="lnav"><button class="lmini" data-act="scrtr">' + (scrShowIt ? 'Nascondi traduzione' : 'Mostra traduzione') + '</button><button class="lmini" data-act="scrren" data-arg="' + i + '">Rinomina</button><button class="lmini" data-act="scrdel" data-arg="' + i + '">Elimina</button></div>';
+    var seenEn = {}, dups = 0; d.items.forEach(function (x) { var k = x.en.trim().toLowerCase(); if (seenEn[k]) dups++; else seenEn[k] = 1; });
+    if (dups) out += '<div class="lnote">⚠️ Ci sono ' + dups + ' frasi ripetute in questo discorso.</div><button class="bigbtn alt" data-act="scrdedup" data-arg="' + i + '">Togli le frasi ripetute</button>';
     if (!d.items.length) out += '<div class="empty">Vuoto. Negli Schemi tocca ＋ accanto a una frase per aggiungerla qui.</div>';
     d.items.forEach(function (it, k) {
       out += '<div class="scritem" id="si' + k + '"><div class="scrn">' + (k + 1) + '</div><div class="scrt"><div class="scren">' + esc(it.en) + '</div>' + (scrShowIt && it.it ? '<div class="scrit">' + esc(it.it) + '</div>' : '') + '</div>' +
@@ -660,7 +665,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v98</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v99</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -811,6 +816,7 @@
     }
     else if (act === 'scrsave') { var q5 = arg.split(':'), it5 = scripts[+q5[0]].items[+q5[1]]; it5.en = document.getElementById('sced1').value.trim() || it5.en; it5.it = document.getElementById('sced2').value.trim(); saveScripts(); render(); }
     else if (act === 'scrcancel') render();
+    else if (act === 'scrdedup') { var sd = scripts[+arg], sn = {}; sd.items = sd.items.filter(function (x) { var k = x.en.trim().toLowerCase(); if (sn[k]) return false; sn[k] = 1; return true; }); saveScripts(); render(); toast('Frasi ripetute tolte'); }
     else if (act === 'screxport') {
       try { var ea = document.createElement('a'); ea.href = URL.createObjectURL(new Blob([JSON.stringify(scripts, null, 1)], { type: 'application/json' })); ea.download = 'discorsi.json'; document.body.appendChild(ea); ea.click(); ea.remove(); } catch (er) {}
     }
