@@ -276,3 +276,5 @@ mark.pos{background:#ffe066;color:#1c1c1e;font-weight:700;border-radius:4px;padd
 .scrit{font-size:13px;color:var(--muted);margin-top:3px;line-height:1.35;}
 .scrb{display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end;max-width:112px;}
 .scrb .lmini{padding:6px 8px;min-height:36px;font-size:14px;}
+
+.scrbulk{display:block;width:100%;margin:8px 0 2px;}
