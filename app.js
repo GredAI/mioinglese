@@ -121,19 +121,36 @@
     return { en: en, it: it };
   }
   function closeSheet() { var s = document.getElementById('scrsheet'); if (s) s.remove(); }
-  function openSheet(item) {
+  function openSheet(items) {
+    if (!Array.isArray(items)) items = [items];
+    var item = items[0];
     closeSheet();
     var sh = document.createElement('div'); sh.id = 'scrsheet'; sh.className = 'sheetbg'; sh.setAttribute('data-act', 'scrclose');
-    sh._item = item;
-    sh.innerHTML = '<div class="sheet"><div class="sheett">Aggiungi a quale discorso?</div><div class="sheetp">' + esc(item.en) + '</div>' +
+    sh._items = items;
+    sh.innerHTML = '<div class="sheet"><div class="sheett">Aggiungi a quale discorso?</div><div class="sheetp">' + (items.length > 1 ? items.length + ' frasi: ' : '') + esc(item.en) + '</div>' +
       scripts.map(function (d, i) { return '<button class="sheetb" data-act="scrpick" data-arg="' + i + '">' + esc(d.name) + ' <small>(' + d.items.length + ' frasi)</small></button>'; }).join('') +
       '<button class="sheetb new" data-act="scrnew">＋ Nuovo discorso…</button><button class="sheetb cancel" data-act="scrclose">Annulla</button></div>';
     document.body.appendChild(sh);
   }
-  function scrAdd(i, item) {
+  function scrAdd(i, items) {
     if (!scripts[i]) return;
-    scripts[i].items.push({ en: item.en, it: item.it }); saveScripts();
-    toast('Aggiunta a «' + scripts[i].name + '»');
+    if (!Array.isArray(items)) items = [items];
+    items.forEach(function (item) { scripts[i].items.push({ en: item.en, it: item.it }); });
+    saveScripts();
+    toast((items.length > 1 ? items.length + ' frasi aggiunte' : 'Frase aggiunta') + ' a «' + scripts[i].name + '»');
+  }
+  function hiItems(cardIdx) {
+    var out = [];
+    (D.schemi || []).forEach(function (s, i) {
+      if (!s.rows || (cardIdx != null && cardIdx !== i)) return;
+      s.rows.forEach(function (r, ri) { if (schemaHi.has(hkey(s, ri))) out.push(rowToItem(s, r)); });
+    });
+    return out;
+  }
+  function scrTarget(items) {
+    if (!items.length) { toast('Nessuna riga evidenziata'); return; }
+    if (!scripts.length) { var nm = window.prompt('Nome del nuovo discorso (es. Presentazione)', 'Presentazione'); if (!nm) return; scripts.push({ id: scrId(), name: nm.trim(), items: [] }); saveScripts(); scrAdd(0, items); }
+    else openSheet(items);
   }
   function scrListScreen() {
     var out = topBar('I miei discorsi', 'home') + '<main class="fade" id="body">' +
@@ -414,7 +431,7 @@
     schemaHi.forEach(function (k) { var p = hiParse(k); if (p) (by[p.i] = by[p.i] || []).push(p.ri); });
     var ids = Object.keys(by).map(Number).sort(function (a, b) { return a - b; });
     if (!ids.length) return '<div class="empty">Nessuna frase evidenziata.<br>Negli Schemi tocca una riga di una tabella: si colora di giallo e la ritrovi qui.</div>';
-    return '<div class="lnote">Tocca una riga per togliere l\'evidenziazione (sparisce quando riapri questa pagina).</div>' + ids.map(function (i) {
+    return '<div class="lnote">Tocca una riga per togliere l\'evidenziazione (sparisce quando riapri questa pagina).</div><button class="bigbtn alt" data-act="scrbulk" data-arg="all">＋ Aggiungi le frasi evidenziate a un discorso</button>' + ids.map(function (i) {
       var s = D.schemi[i];
       var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '</tr>';
       var rows = by[i].sort(function (a, b) { return a - b; }).map(function (ri) {
@@ -473,6 +490,7 @@
       return '<div class="schemecard' + (open ? ' open' : '') + '" data-schema="' + i + '">' +
         '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
         '<div class="sbody"><div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
+        '<button class="lmini scrbulk" data-act="scrbulk" data-arg="' + i + '">＋ Aggiungi le righe evidenziate di questa card a un discorso</button>' +
         (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + noteBlock('s:' + s.title) +
         '</div></div>';
     }).join('');
@@ -642,7 +660,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v94</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v95</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -761,12 +779,11 @@
     }
     else if (act === 'scradd') {
       var pp = hiParse(arg); if (!pp) return;
-      var item = rowToItem(D.schemi[pp.i], D.schemi[pp.i].rows[pp.ri]);
-      if (!scripts.length) { var nm = window.prompt('Nome del nuovo discorso (es. Presentazione)', 'Presentazione'); if (!nm) return; scripts.push({ id: scrId(), name: nm.trim(), items: [] }); saveScripts(); scrAdd(0, item); }
-      else openSheet(item);
+      scrTarget([rowToItem(D.schemi[pp.i], D.schemi[pp.i].rows[pp.ri])]);
     }
-    else if (act === 'scrpick') { var sh = document.getElementById('scrsheet'); if (sh && sh._item) scrAdd(+arg, sh._item); closeSheet(); }
-    else if (act === 'scrnew') { var sh2 = document.getElementById('scrsheet'), it2 = sh2 && sh2._item; var nm2 = window.prompt('Nome del nuovo discorso', ''); if (!nm2) return; scripts.push({ id: scrId(), name: nm2.trim(), items: [] }); saveScripts(); if (it2) scrAdd(scripts.length - 1, it2); closeSheet(); }
+    else if (act === 'scrbulk') { scrTarget(hiItems(arg === 'all' ? null : +arg)); }
+    else if (act === 'scrpick') { var sh = document.getElementById('scrsheet'); if (sh && sh._items) scrAdd(+arg, sh._items); closeSheet(); }
+    else if (act === 'scrnew') { var sh2 = document.getElementById('scrsheet'), it2 = sh2 && sh2._items; var nm2 = window.prompt('Nome del nuovo discorso', ''); if (!nm2) return; scripts.push({ id: scrId(), name: nm2.trim(), items: [] }); saveScripts(); if (it2) scrAdd(scripts.length - 1, it2); closeSheet(); }
     else if (act === 'scrclose') { if (e.target && (e.target.id === 'scrsheet' || (e.target.closest && e.target.closest('.cancel')))) closeSheet(); }
     else if (act === 'scrnew2') { var nm3 = window.prompt('Nome del nuovo discorso', ''); if (!nm3) return; scripts.push({ id: scrId(), name: nm3.trim(), items: [] }); saveScripts(); render(); }
     else if (act === 'scropen') go('discorso', arg);
