@@ -33,17 +33,36 @@
   }
   // parole che la voce del telefono legge male → le facciamo pronunciare con un omofono/spelling corretto
   var SAY = { hour: 'our' };
+  var PH = [[/\bBologna\b/gi, 'Bo-lone-ya'], [/\bgnocchi\b/gi, 'nyocky'], [/\bbruschetta\b/gi, 'broo-sketta'], [/\bprosciutto\b/gi, 'pro-shoo-toh'], [/\bfocaccia\b/gi, 'fo-katcha'], [/\bciabatta\b/gi, 'cha-batta'], [/\bTenerife\b/gi, 'Tenneh-reef'], [/\bHIIT\b/g, 'hit'], [/\bMr\.?(?=\s)/g, 'Mister'], [/\bMrs\.?(?=\s)/g, 'Missus'], [/\bMs\.?(?=\s)/g, 'Miz'], [/\bDr\.?(?=\s)/g, 'Doctor'], [/\ba\.m\./gi, 'A M'], [/\bp\.m\./gi, 'P M'], [/\bvs\.?(?=\s)/gi, 'versus'], [/\be\.g\./gi, 'for example'], [/\bi\.e\./gi, 'that is'], [/\s*&\s*/g, ' and '], [/(\d)\s*%/g, '$1 percent'], [/(\d{1,2}):(\d{2})/g, '$1 $2']];
+  function normEn(s) { PH.forEach(function (r) { s = s.replace(r[0], r[1]); }); return s; }
+  var BAD_V = /^(Albert|Bad News|Bahh|Bells|Boing|Bubbles|Cellos|Deranged|Good News|Hysterical|Jester|Organ|Superstar|Trinoids|Whisper|Wobble|Zarvox|Fred|Junior|Ralph|Kathy|Eddy|Flo|Grandma|Grandpa|Reed|Rocko|Sandy|Shelley)\b/i;
+  var GOOD_EN = /\b(Daniel|Serena|Kate|Oliver|Samantha|Ava|Allison|Tom|Stephanie|Arthur|Martha|Moira|Karen|Siri)\b/i, GOOD_IT = /\b(Luca|Alice|Federica|Paola|Emma|Silvia)\b/i;
+  function bestVoice(l) {
+    var vs = speechSynthesis.getVoices(); if (!vs.length) return null;
+    if (l === 'en' && lopts && lopts.voice) { var pv = vs.filter(function (x) { return x.name === lopts.voice; })[0]; if (pv) return pv; }
+    var re = l === 'it' ? /^it(-|_)?/i : /^en(-|_)?/i, best = null, bs = -1e9;
+    vs.forEach(function (x) {
+      if (!re.test(x.lang)) return;
+      var s = 0, nm = x.name + ' ' + (x.voiceURI || '');
+      if (BAD_V.test(x.name)) s -= 50;
+      if (/premium|enhanced|migliorata|potenziata/i.test(nm)) s += 20;
+      if ((l === 'it' ? GOOD_IT : GOOD_EN).test(x.name)) s += 6;
+      if (l === 'en') { if (/en[-_]GB/i.test(x.lang)) s += 4; else if (/en[-_]US/i.test(x.lang)) s += 3; else if (/en[-_]AU/i.test(x.lang)) s += 2; }
+      if (x.localService) s += 1;
+      if (s > bs) { bs = s; best = x; }
+    });
+    return best;
+  }
   function speak(text) {
     try {
       if (!('speechSynthesis' in window)) return;
       unlockVoice();
       speechSynthesis.cancel();
-      var say = SAY[text.trim().toLowerCase()] || text;
+      var say = SAY[text.trim().toLowerCase()] || normEn(text);
       var u = new SpeechSynthesisUtterance(say);
       u.lang = 'en-GB'; u.rate = 0.9;
-      var vs = speechSynthesis.getVoices();
-      var v = vs.filter(function (x) { return /^en(-|_)?(GB|US|AU)?/i.test(x.lang); })[0];
-      if (v) u.voice = v;
+      var v = bestVoice('en');
+      if (v) { u.voice = v; u.lang = v.lang; }
       speechSynthesis.speak(u);
     } catch (e) {}
   }
@@ -172,7 +191,8 @@
     var i = scripts.map(function (d) { return d.id; }).indexOf(id), d = scripts[i];
     if (!d) return scrListScreen();
     var out = topBar(d.name, 'discorsi') + '<main class="fade" id="body">' +
-      '<div class="lnav"><button class="lmini" data-act="scrplay" data-arg="' + i + '">▶︎ Ascolta</button><button class="lmini" data-act="scrcopy" data-arg="' + i + '">Copia testo</button></div>' +
+      '<button class="bigbtn" data-act="scrplay" data-arg="' + i + ':0">▶︎ Ascolta il discorso intero</button>' +
+      '<div class="lnav"><button class="lmini" data-act="scrplay" data-arg="' + i + ':1">Frase per frase, con traduzione</button><button class="lmini" data-act="scrcopy" data-arg="' + i + '">Copia testo</button></div>' +
       '<div class="lnav"><button class="lmini" data-act="scrtr">' + (scrShowIt ? 'Nascondi traduzione' : 'Mostra traduzione') + '</button><button class="lmini" data-act="scrren" data-arg="' + i + '">Rinomina</button><button class="lmini" data-act="scrdel" data-arg="' + i + '">Elimina</button></div>';
     var seenEn = {}, dups = 0; d.items.forEach(function (x) { var k = x.en.trim().toLowerCase(); if (seenEn[k]) dups++; else seenEn[k] = 1; });
     if (dups) out += '<div class="lnote">⚠️ Ci sono ' + dups + ' frasi ripetute in questo discorso.</div><button class="bigbtn alt" data-act="scrdedup" data-arg="' + i + '">Togli le frasi ripetute</button>';
@@ -667,7 +687,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v101</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v102</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -805,7 +825,8 @@
       try { navigator.clipboard.writeText(txt).then(function () { toast('Testo copiato'); }); } catch (er) { toast('Copia non disponibile'); }
     }
     else if (act === 'scrplay') {
-      LG.forEach(function (g) { lsel[g.id].clear(); }); lsel.discorsi.add(+arg); saveLsel();
+      var spa = arg.split(':'); lopts.dIt = spa[1] === '1'; lopts.mode = 'lezione'; save('listenOpts', lopts);
+      LG.forEach(function (g) { lsel[g.id].clear(); }); lsel.discorsi.add(+spa[0]); saveLsel();
       go('ascolto'); lpStart();
     }
     else if (act === 'scrspk') { var q1 = arg.split(':'); speak(scripts[+q1[0]].items[+q1[1]].en); }
@@ -923,6 +944,7 @@
     onAct(e, el);
   });
   document.addEventListener('change', function (e) {
+    if (e.target && e.target.id === 'lvoice') { lopts.voice = e.target.value; save('listenOpts', lopts); try { speak('Hello, this is how I sound. Nice to meet you!'); } catch (x) {} return; }
     var id = e.target && e.target.id; if (id !== 'scrimp' && id !== 'noteimp' && id !== 'bakimp') return;
     var f = e.target.files && e.target.files[0]; if (!f) return;
     var rd = new FileReader();
@@ -1123,7 +1145,18 @@
       });
     } else if (g === 'vocab') { var v = D.vocab[i]; pushL(a, 'en', v.en.replace(/\(.*?\)/g, '')); pushL(a, 'it', v.it.replace(/\(.*?\)/g, '')); }
     else if (g === 'frasi') { var d = D.idiomi[i]; pushL(a, 'en', d.en); pushL(a, 'it', d.it.replace(/\(.*?\)/g, '')); pushL(a, 'en', d.extra); }
-    else if (g === 'discorsi') { var sc = scripts[i]; (sc ? sc.items : []).forEach(function (it, ii) { curKey = 'discorsi:' + i + ':' + ii; if (it.en) pushL(a, 'en', it.en); if (it.it) pushL(a, 'it', it.it); }); }
+    else if (g === 'discorsi') {
+      var sc = scripts[i], gd = ++segGroup;
+      (sc ? sc.items : []).forEach(function (it, ii) {
+        curKey = 'discorsi:' + i + ':' + ii;
+        if (lopts.dIt) { if (it.en) pushL(a, 'en', it.en); if (it.it) pushL(a, 'it', it.it); return; }
+        // discorso intero: tutto in inglese, di seguito, spezzato per frasi solo per non tagliare l'audio
+        var parts = (normEn(clean(it.en)).match(/[^.!?]+[.!?]*/g) || []).map(function (x) { return x.trim(); }).filter(Boolean), buf = '';
+        parts.forEach(function (x) { buf = buf ? buf + ' ' + x : x; if (buf.length >= 28) { a.push({ l: 'en', t: buf, g: gd, k: curKey, pause: 250 }); buf = ''; } });
+        if (buf) a.push({ l: 'en', t: buf, g: gd, k: curKey, pause: 250 });
+      });
+      if (!lopts.dIt && a.length) a[a.length - 1].pause = 2000;
+    }
     else if (g === 'phrasal') { var p = D.phrasal[i]; pushL(a, 'en', p.pv); pushL(a, 'it', p.it); pushL(a, 'en', p.ex); }
     return a;
   }
@@ -1149,9 +1182,7 @@
     return out;
   }
   function pickVoice(l) {
-    var vs = speechSynthesis.getVoices();
-    var re = l === 'it' ? /^it(-|_)?/i : /^en(-|_)?(GB|US|AU)?/i;
-    return vs.filter(function (x) { return re.test(x.lang); })[0];
+    return bestVoice(l);
   }
   function lpStatus(msg) {
     var el = document.getElementById('lpstat'); if (!el) return;
@@ -1170,8 +1201,8 @@
     if (lp.endAt && Date.now() >= lp.endAt) { lpStop('⏹ Spento automaticamente.'); return; }
     if (lp.idx >= lp.queue.length) { if (lopts.loop) lp.idx = 0; else { lpStop('✓ Finito.'); return; } }
     var s = lp.queue[lp.idx], myGen = ++lp.gen;
-    var u = new SpeechSynthesisUtterance(s.t); u.lang = s.l === 'it' ? 'it-IT' : 'en-GB'; u.rate = s.sleep ? 0.72 : (s.l === 'it' ? Math.min(1, lopts.rate + 0.05) : lopts.rate);
-    var v = pickVoice(s.l); if (v) u.voice = v;
+    var u = new SpeechSynthesisUtterance(s.l === 'en' ? normEn(s.t) : s.t); u.lang = s.l === 'it' ? 'it-IT' : 'en-GB'; u.rate = s.sleep ? 0.72 : (s.l === 'it' ? Math.min(1, lopts.rate + 0.05) : lopts.rate);
+    var v = pickVoice(s.l); if (v) { u.voice = v; u.lang = v.lang; }
     var nx = lp.queue[lp.idx + 1], gap = s.pause || ((nx && nx.g === s.g) ? 120 : 600);
     var done = false, next = function () { if (done || myGen !== lp.gen || lp.paused) return; done = true; lp.idx++; lpLater(lpStep, gap); };
     u.onend = next; u.onerror = next;
@@ -1213,6 +1244,12 @@
   function lpNext() { var i = lp.idx; while (i < lp.queue.length - 1 && lp.queue[i + 1].g === lp.queue[lp.idx].g) i++; lpJump(Math.min(i + 1, lp.queue.length - 1)); }
   setInterval(function () { if (lp.playing && !lp.paused) lpStatus(); }, 5000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden && lp.playing && !lp.paused) lpWake(); });
+  function voiceOpts() {
+    var o = '<option value="">Automatica (la migliore disponibile)</option>';
+    try { speechSynthesis.getVoices().filter(function (x) { return /^en(-|_)/i.test(x.lang) && !BAD_V.test(x.name); }).forEach(function (x) { o += '<option value="' + esc(x.name) + '"' + (lopts.voice === x.name ? ' selected' : '') + '>' + esc(x.name) + ' (' + x.lang + ')</option>'; }); } catch (e) {}
+    return o;
+  }
+  try { speechSynthesis.addEventListener('voiceschanged', function () { var s = document.getElementById('lvoice'); if (s) s.innerHTML = voiceOpts(); }); } catch (e) {}
   function lopt(label, key, vals, fmt) {
     return '<div class="lrow"><div class="llab">' + label + '</div><div class="tagbar">' + vals.map(function (v) {
       return '<button class="tagbtn lchip' + (lopts[key] === v ? ' on' : '') + '" data-act="lopt" data-arg="' + key + ':' + v + '">' + fmt(v) + '</button>';
@@ -1241,6 +1278,7 @@
       lopt('Modalità', 'mode', ['lezione', 'sonno'], function (v) { return v === 'sonno' ? '🌙 Sonno: solo inglese, lento, in loop' : '📖 Lezione: italiano + inglese'; }) +
       lopt('Durata (poi si spegne)', 'min', [15, 30, 60, 90, 120, 0], function (v) { return v ? v + ' min' : '∞'; }) +
       lopt('Quando finisce la lista', 'loop', [false, true], function (v) { return v ? '🔁 Ripeti' : 'Ferma'; }) +
+      '<div class="lrow"><div class="llab">Voce inglese</div><select id="lvoice" class="vsel">' + voiceOpts() + '</select></div>' +
       lopt('Velocità', 'rate', [0.7, 0.8, 0.9, 1], function (v) { return '×' + v; }) +
       '<div class="hgroup">Contenuti (' + tot + ' selezionati)</div>';
     LG.forEach(function (g) {
