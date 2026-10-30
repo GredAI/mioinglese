@@ -687,7 +687,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v102</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v103</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -788,7 +788,7 @@
         if (r) pushRecent({ id: 'rule:' + n, label: 'Regola ' + n + ': ' + r.title });
       }
     }
-    else if (act.charAt(0) === 'l' && /^(lopt|lpause|lstop|lprev|lnext|lgrp|lall|lnone|lsel|lexport|lex|lrestore|lrestoreall|lexcur)$/.test(act)) { lclick(act, arg, el); }
+    else if (act.charAt(0) === 'l' && /^(lopt|lpause|lstop|lprev|lfull|ljump|lnext|lgrp|lall|lnone|lsel|lexport|lex|lrestore|lrestoreall|lexcur)$/.test(act)) { lclick(act, arg, el); }
     else if (act === 'schema') {
       // apri/chiudi la card dello schema SUL POSTO, senza ricostruire la schermata
       var si = +arg, schemaEl = el.closest('.schemecard');
@@ -1187,10 +1187,14 @@
   function lpStatus(msg) {
     var el = document.getElementById('lpstat'); if (!el) return;
     var left = lp.endAt ? Math.max(0, Math.round((lp.endAt - Date.now()) / 60000)) : 0;
-    var cur = lp.queue[lp.idx] || {};
-    el.innerHTML = msg || (lp.playing ? (lp.paused ? '⏸ In pausa' : '▶︎ In ascolto') + ' · frase ' + (lp.idx + 1) + '/' + lp.queue.length + (lp.endAt ? ' · si spegne tra ' + left + ' min' : '') +
-      '<div class="lcur"><b>' + esc(cur.t || '') + '</b>' + (cur.tr ? '<div class="ltr">' + esc(cur.tr) + '</div>' : '') + '</div>' +
+    var cur = lp.queue[lp.idx] || {}, full = lpSeq() && lopts.full !== false, body;
+    if (full) {
+      body = '<div class="lcur lfull">' + lp.queue.map(function (x, k) { return x.g === cur.g ? '<span class="lseg' + (k === lp.idx ? ' lhl' : '') + '" data-act="ljump" data-arg="' + k + '">' + esc(x.t) + ' </span>' : ''; }).join('') + '</div>';
+    } else body = '<div class="lcur"><b>' + esc(cur.t || '') + '</b>' + (cur.tr ? '<div class="ltr">' + esc(cur.tr) + '</div>' : '') + '</div>';
+    if (lpSeq()) body += '<button class="lmini" data-act="lfull">' + (full ? 'Mostra una frase per volta' : 'Mostra il discorso intero') + '</button> ';
+    el.innerHTML = msg || (lp.playing ? (lp.paused ? '⏸ In pausa' : '▶︎ In ascolto') + ' · frase ' + (lp.idx + 1) + '/' + lp.queue.length + (lp.endAt ? ' · si spegne tra ' + left + ' min' : '') + body +
       '<button class="lmini" data-act="lexcur">🚫 Togli questa frase dall\'ascolto</button>' : 'Pronta.');
+    if (full && lp.playing && lp.shown !== lp.idx) { lp.shown = lp.idx; var hl = el.querySelector('.lhl'); if (hl && hl.scrollIntoView) try { hl.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); } catch (e) {} }
     var pb = document.getElementById('lpbtn'); if (pb) pb.textContent = lp.playing ? (lp.paused ? '▶︎ Riprendi' : '⏸ Pausa') : '▶︎ Avvia ascolto';
     var sb = document.getElementById('lsbtn'); if (sb) sb.style.display = lp.playing ? '' : 'none';
     var nb = document.getElementById('lnav'); if (nb) nb.style.display = lp.playing ? '' : 'none';
@@ -1240,8 +1244,9 @@
     lpStatus();
     if (!lp.paused) lpLater(lpStep, 150);
   }
-  function lpPrev() { var gs = lpGroupStart(lp.idx); lpJump(lp.idx > gs ? gs : lpGroupStart(Math.max(0, gs - 1))); }
-  function lpNext() { var i = lp.idx; while (i < lp.queue.length - 1 && lp.queue[i + 1].g === lp.queue[lp.idx].g) i++; lpJump(Math.min(i + 1, lp.queue.length - 1)); }
+  function lpSeq() { var c = lp.queue[lp.idx]; return !!(c && c.src === 'discorsi' && !lopts.dIt); }
+  function lpPrev() { if (lpSeq()) { lpJump(Math.max(0, lp.idx - 1)); return; } var gs = lpGroupStart(lp.idx); lpJump(lp.idx > gs ? gs : lpGroupStart(Math.max(0, gs - 1))); }
+  function lpNext() { if (lpSeq()) { lpJump(Math.min(lp.queue.length - 1, lp.idx + 1)); return; } var i = lp.idx; while (i < lp.queue.length - 1 && lp.queue[i + 1].g === lp.queue[lp.idx].g) i++; lpJump(Math.min(i + 1, lp.queue.length - 1)); }
   setInterval(function () { if (lp.playing && !lp.paused) lpStatus(); }, 5000);
   document.addEventListener('visibilitychange', function () { if (!document.hidden && lp.playing && !lp.paused) lpWake(); });
   function voiceOpts() {
@@ -1305,6 +1310,8 @@
     else if (act === 'lpause') lpPause();
     else if (act === 'lstop') lpStop();
     else if (act === 'lprev') lpPrev();
+    else if (act === 'lfull') { lopts.full = lopts.full === false; save('listenOpts', lopts); lpStatus(); }
+    else if (act === 'ljump') lpJump(+arg);
     else if (act === 'lnext') lpNext();
     else if (act === 'lgrp') { lopen[arg] = !lopen[arg]; render(); }
     else if (act === 'lall') { var g = LG.filter(function (x) { return x.id === arg; })[0]; for (var i = 0; i < g.n(); i++) lsel[arg].add(i); saveLsel(); render(); }
