@@ -284,3 +284,16 @@ mark.pos{background:#ffe066;color:#1c1c1e;font-weight:700;border-radius:4px;padd
 .vsel{width:100%;padding:10px;border-radius:10px;border:1px solid #d8d8de;font-size:15px;background:#fff}
 
 .lfull{line-height:1.7;text-align:left}.lseg{border-radius:6px;padding:1px 2px;cursor:pointer}.lhl{background:#ffe9a8;font-weight:600}
+
+.c-t{background:#dff3f1;color:#0b5a55;}
+.vmod{padding:12px 14px;border-radius:14px;margin:8px 0;}
+.vmh{display:flex;align-items:center;gap:10px;}
+.vmn{width:28px;height:28px;border-radius:50%;background:currentColor;display:inline-flex;align-items:center;justify-content:center;flex:0 0 28px;}
+.vmn{color:inherit;position:relative;font-size:0;}
+.vmn::after{content:attr(data-n);}
+.vmk{font-size:22px;font-weight:800;text-transform:uppercase;letter-spacing:.3px;}
+.vmf{font-size:14px;font-weight:600;margin-top:4px;line-height:1.3;}
+.vme{font-size:12px;opacity:.75;margin-bottom:6px;}
+.vmx{font-size:14px;font-weight:600;margin-top:4px;line-height:1.3;}
+.vmx i{display:block;font-weight:400;font-size:13px;opacity:.85;}
+.vmn::after{color:#fff;font-size:14px;font-weight:800;}
