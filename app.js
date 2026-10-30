@@ -434,6 +434,11 @@
         body = b.rows.map(function (r) {
           return '<div class="vflow c-' + (r.c || 'b') + '"><div class="vq">' + esc(r.q) + '</div><div class="va">→ ' + esc(r.a) + '</div>' + (r.ex ? '<div class="vex">' + esc(r.ex) + '</div>' : '') + (r.it ? '<div class="vit">' + esc(r.it) + '</div>' : '') + '</div>';
         }).join('');
+      } else if (b.type === 'mod') {
+        body = b.rows.map(function (r) {
+          return '<div class="vmod c-' + (r.c || 'b') + '"><div class="vmh"><span class="vmn" data-n="' + esc(r.n) + '"></span><b class="vmk">' + esc(r.k) + '</b></div><div class="vmf">' + esc(r.f) + '</div><div class="vme">' + esc(r.e) + '</div>' +
+            r.ex.map(function (x) { return '<div class="vmx">' + esc(x[0]) + '<i>' + esc(x[1]) + '</i></div>'; }).join('') + '</div>';
+        }).join('');
       } else if (b.type === 'grid') {
         body = '<div class="vgrid" style="grid-template-columns:minmax(0,.8fr) repeat(' + b.cols.length + ',1fr)"><div></div>' +
           b.cols.map(function (c, ci) { return '<div class="vcell vhead g' + ci + '"><b>' + esc(c.t) + '</b><small>' + esc(c.s || '') + '</small></div>'; }).join('') +
@@ -687,7 +692,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v103</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v104</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -1124,6 +1129,7 @@
             if (b.type === 'flow') { pushL(a, 'it', r.q); pushL(a, 'en', r.ex); pushL(a, 'it', r.it); }
             else if (b.type === 'rows') { pushL(a, 'en', r.key); pushL(a, 'en', r.ex); pushL(a, 'it', r.it); }
             else if (b.type === 'grid') { r.cells.forEach(function (c) { pushL(a, 'en', c.t); }); }
+            else if (b.type === 'mod') { pushL(a, 'en', r.k); pushL(a, 'it', r.f); r.ex.forEach(function (x) { pushL(a, 'en', x[0]); pushL(a, 'it', x[1]); }); }
           });
         });
       } else {
