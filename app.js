@@ -255,11 +255,17 @@
       dot + favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
       '<div class="body"><div class="body-in">' + tagbar + body + noteBlock('r' + r.n) + '</div></div></div>';
   }
+  function vsplit(x) {
+    x = x || ''; var j = x.indexOf(' | ');
+    if (j >= 0) return { pr: x.slice(0, j), ex: x.slice(j + 3) };
+    return /[.?!]$/.test(x) ? { pr: '', ex: x } : { pr: x, ex: '' };
+  }
   function vocRow(v, i) {
+    var sp = vsplit(v.extra);
     return '<div class="row">' + speakBtn(v.en.replace(/\(.*?\)/g, '')) +
       '<div class="main"><div class="line"><span class="en">' + esc(v.en) + '</span>' +
-      (v.extra ? '<span class="pr">/' + esc(v.extra) + '/</span>' : '') +
-      '<span class="it">' + esc(v.it) + '</span></div></div>' + favBtn('v' + i) + '</div>';
+      (sp.pr ? '<span class="pr">/' + esc(sp.pr) + '/</span>' : '') +
+      '<span class="it">' + esc(v.it) + '</span></div>' + (sp.ex ? '<div class="exq">' + esc(sp.ex) + '</div>' : '') + '</div>' + favBtn('v' + i) + '</div>';
   }
   function idiRow(d, i) {
     return '<div class="row"><div class="main"><div class="line"><span class="en">' + esc(d.en) + '</span>' +
@@ -562,7 +568,7 @@
   var flashDeck = load('flashDeck', 'all'); // 'all' | 'voc' | 'phr' | 'pv'
   function flashPool() {
     var a = [];
-    D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: d.extra, ty: 'voc' }); });
+    D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: vsplit(d.extra).pr, ty: 'voc' }); });
     D.idiomi.forEach(function (d, i) { a.push({ id: 'i' + i, en: d.en, it: d.it, pr: '', ty: 'phr' }); });
     D.canzoni.forEach(function (s, si) { s.items.forEach(function (d, ii) { a.push({ id: 's' + si + '_' + ii, en: d.en, it: d.it, pr: '', ty: 'phr' }); }); });
     if (D.phrasal) D.phrasal.forEach(function (d, i) { a.push({ id: 'p' + i, en: d.pv, it: d.it + ' (= ' + d.eq + ', ' + d.sep + ')', pr: '', ty: 'pv' }); });
@@ -692,7 +698,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v104</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v105</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
