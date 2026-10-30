@@ -280,3 +280,5 @@ mark.pos{background:#ffe066;color:#1c1c1e;font-weight:700;border-radius:4px;padd
 .scrbulk{display:block;width:100%;margin:8px 0 2px;}
 
 .implabel{display:block;text-align:center;cursor:pointer;}
+
+.vsel{width:100%;padding:10px;border-radius:10px;border:1px solid #d8d8de;font-size:15px;background:#fff}
