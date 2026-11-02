@@ -336,7 +336,7 @@ tr.tentopen .tent{display:block}
 .card[data-rule]{border-left:5px solid #9aa0aa}
 .card.rc0{border-left-color:#2e5aac}.card.rc1{border-left-color:#3f8a1f}.card.rc2{border-left-color:#6a46b8}.card.rc3{border-left-color:#c77700}
 .card.rc4{border-left-color:#127a72}.card.rc5{border-left-color:#c0392b}.card.rc6{border-left-color:#a88400}.card.rc7{border-left-color:#7a8088}
-.card[data-rule] .num{background:var(--accent)}
+.card[data-rule] .num{background:var(--accent);color:#fff}
 
 .widebtn{display:block;margin:14px auto;background:#e6f0fd;color:#0b3d7a;border:1px solid #bcd3f5;padding:10px 14px;border-radius:12px;font-weight:700}
 

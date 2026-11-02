@@ -282,7 +282,7 @@
   }
   function ruleCard(r, open) {
     var vis = r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; });
-    var desc = r.short || (vis[0] && vis[0].s ? vis[0].s.replace(/\*\*|\[\[|\]\]/g, '') : '');
+    var desc = r.short || '';
     var chars = vis.map(function (i) { return i.s || ''; }).join(' ').length;
     var lunga = chars > 500 ? '<span class="lunga">LUNGA</span>' : '';
     var tag = ruleTag[r.n];
@@ -299,7 +299,7 @@
     if (snipTerm && !open && r.title.toLowerCase().indexOf(snipTerm) < 0) { var sn = snippet(vis.map(function (i) { return i.s || ''; }).join(' · '), snipTerm); if (sn) desc = sn; }
     return '<div class="card rc' + rci + ' ' + (open ? 'open' : '') + '" data-rule="' + r.n + '">' +
       '<div class="head" data-act="rule" data-arg="' + r.n + '"><span class="num">' + r.n + '</span>' +
-      '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc' + (snipTerm ? ' snip' : '') + '">' + esc(snipTerm || r.short ? desc : desc.slice(0, 70) + (desc.length > 70 ? '…' : '')) + '</span>') + '</span>' +
+      '<span class="ctitle">' + esc(r.title) + lunga + (open || !desc ? '' : '<span class="cdesc' + (snipTerm ? ' snip' : '') + '">' + esc(desc) + '</span>') + '</span>' +
       dot + favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
       '<div class="body"><div class="body-in">' + tagbar + body + ruleLink(r.n) + noteBlock('r' + r.n) + '</div></div></div>';
   }
@@ -469,13 +469,27 @@
         rows.map(function (d) { return '<div class="row"><div class="main"><div class="line"><span class="en">' + esc(d.en) + '</span><span class="it">' + esc(d.it) + '</span></div>' + (d.ex ? '<div class="exq">' + esc(d.ex) + '</div>' : '') + '</div></div>'; }).join('');
     }).join('') || '<div class="empty">Nessun risultato.</div>';
   }
-  function raccontiScreen() {
-    var list = D.racconti.map(function (s, i) {
-      var m = s.title.match(/^(.*?)\s*\((.*?)\)\s*$/);
-      var title = m ? m[1].trim() : s.title, date = m ? m[2] : '';
-      return '<div class="card" data-act="go2" data-arg="racc:' + i + '"><div class="head"><span class="ctitle">' + esc(title) + (date ? '<span class="cdesc">' + esc(date) + '</span>' : '') + '</span><span class="chev">›</span></div></div>';
+  function raccList(t) {
+    return D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return !t || sm(x.s.title + ' ' + x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' '), t); }).map(function (x) {
+      var m = x.s.title.match(/^(.*?)\s*\((.*?)\)\s*$/);
+      var title = m ? m[1].trim() : x.s.title, date = m ? m[2] : '';
+      return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(title) + (date ? '<span class="cdesc">' + esc(date) + '</span>' : '') + '</span><span class="chev">›</span></div></div>';
     }).join('');
-    return topBar('Racconti', 'home') + '<main class="fade">' + list + '</main>';
+  }
+  function testiBody(term) {
+    var t = (term || '').toLowerCase().trim(), nC = (D.schemi || []).filter(function (s) { return isConv(s.title); }).length;
+    var tabs = '<div class="chips"><button class="chip2 ' + (testiTab === 'racc' ? 'on' : '') + '" data-act="testitab" data-arg="racc">📖 Racconti (' + D.racconti.length + ')</button>' +
+      '<button class="chip2 ' + (testiTab === 'conv' ? 'on' : '') + '" data-act="testitab" data-arg="conv">💬 Conversazioni (' + nC + ')</button></div>';
+    if (t) {
+      var rl = raccList(t); schScope = 'conv'; var cl = schemiBody(t); schScope = 'gram';
+      var out = tabs + (rl ? '<div class="hgroup">Racconti</div>' + rl : '') + (cl.indexOf('class="empty"') < 0 ? '<div class="hgroup">Conversazioni</div>' + cl : '');
+      return (!rl && cl.indexOf('class="empty"') >= 0) ? tabs + '<div class="empty">Nessun risultato.</div>' : out;
+    }
+    if (testiTab === 'conv') { schScope = 'conv'; var r = tabs + schemiBody(''); schScope = 'gram'; return r; }
+    return tabs + raccList('');
+  }
+  function raccontiScreen() {
+    return topBar('Testi', 'home') + '<div class="search"><input id="q" type="search" placeholder="Cerca nei racconti e nelle conversazioni…" autocomplete="off"></div><main class="fade" id="body">' + testiBody('') + '</main>';
   }
   function raccDetail(i) {
     var s = D.racconti[i]; if (!s) return home();
@@ -552,7 +566,10 @@
     }).join('');
   }
   var schCat = load('schCat', 'Tutti'), schOrd = load('schOrd', 'orig');
-  var SCH_CATS = ['Tutti', 'Evidenziate', 'Promemoria', 'Grammatica', 'Tempi', 'Conversazione', 'Viaggio', 'Esercizi', 'Archivio chat'];
+  var SCH_CATS = ['Tutti', 'Evidenziate', 'Promemoria', 'Grammatica', 'Tempi', 'Esercizi'];
+  var CONV_CATS = ['Tutti', 'Conversazione', 'Viaggio', 'Archivio chat'];
+  var schScope = 'gram', convCat = 'Tutti', testiTab = 'racc';
+  function isConv(title) { return /^(Conversazione|Chat|Viaggio)/.test(title); }
   if (SCH_CATS.indexOf(schCat) < 0) schCat = 'Tutti';
   function schemaCat(title) {
     if (/^Promemoria/.test(title)) return 'Promemoria';
@@ -579,20 +596,24 @@
   function schemaIdx(prefix) { var p = prefix.toLowerCase(), r = -1; (D.schemi || []).forEach(function (s, i) { if (r < 0 && s.title.toLowerCase().indexOf(p) === 0) r = i; }); return r; }
   function openSchemaByTitle(prefix) {
     var i = schemaIdx(prefix); if (i < 0) { toast('Schema non trovato'); return; }
-    openSchemi.add(i); schCat = 'Tutti'; save('schCat', schCat); go('schemi');
+    openSchemi.add(i);
+    if (isConv(D.schemi[i].title)) { testiTab = 'conv'; convCat = 'Tutti'; go('racconti'); }
+    else { schCat = 'Tutti'; save('schCat', schCat); go('schemi'); }
     setTimeout(function () { var c = document.querySelector('.schemecard[data-schema="' + i + '"]'); if (c) c.scrollIntoView({ block: 'start' }); }, 60);
   }
   function azKey(s) { return s.replace(/^[^A-Za-z0-9À-ÿ]+/, ''); }
   function schemiBody(term, raw) {
     var t = (term || '').toLowerCase().trim(); if (!raw) snipTerm = t;
-    var counts = {}; (D.schemi || []).forEach(function (s) { var c = schemaCat(s.title); counts[c] = (counts[c] || 0) + 1; });
-    var chipbar = raw ? '' : '<div class="chips"><button class="chip2 ' + (schOrd === 'az' ? 'on' : '') + '" data-act="schord">🔤 A–Z</button>' + SCH_CATS.map(function (c) {
-      var n = c === 'Tutti' ? (D.schemi || []).length : c === 'Evidenziate' ? hiCount() : (counts[c] || 0);
-      return '<button class="chip2 ' + (schCat === c ? 'on' : '') + '" data-act="schcat" data-arg="' + c + '">' + c + ' (' + n + ')</button>';
+    var conv = !raw && schScope === 'conv', cats = conv ? CONV_CATS : SCH_CATS, cur = conv ? convCat : schCat;
+    var counts = {}, nAll = 0; (D.schemi || []).forEach(function (s) { if (!raw && isConv(s.title) !== conv) return; nAll++; var c = schemaCat(s.title); counts[c] = (counts[c] || 0) + 1; });
+    var chipbar = raw ? '' : '<div class="chips"><button class="chip2 ' + (schOrd === 'az' ? 'on' : '') + '" data-act="schord">🔤 A–Z</button>' + cats.map(function (c) {
+      var n = c === 'Tutti' ? nAll : c === 'Evidenziate' ? hiCount() : (counts[c] || 0);
+      return '<button class="chip2 ' + (cur === c ? 'on' : '') + '" data-act="schcat" data-arg="' + c + '">' + c + ' (' + n + ')</button>';
     }).join('') + '</div>';
-    if (!raw && !t && schCat === 'Evidenziate') return chipbar + hiView();
+    if (!raw && !t && cur === 'Evidenziate') return chipbar + hiView();
     var cardOf = function (s, i) {
-      if (!raw && !t && schCat !== 'Tutti' && schemaCat(s.title) !== schCat) return '';
+      if (!raw && isConv(s.title) !== conv) return '';
+      if (!raw && !t && cur !== 'Tutti' && schemaCat(s.title) !== cur) return '';
       if (s.blocks) {
         if (t && !sm(s.title, t) && !sm(blocksText(s.blocks), t)) return '';
         var op = openSchemi.has(i);
@@ -642,6 +663,7 @@
     return chipbar + (list || '<div class="empty">' + (t ? 'Nessun risultato.' : 'Nessuno schema ancora.') + '</div>');
   }
   function schemiScreen() {
+    schScope = 'gram';
     return listScreen('Schemi', 'Cerca una frase o un argomento…', schemiBody, true);
   }
 
@@ -805,7 +827,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v112</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v113</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -835,7 +857,7 @@
       '<div class="wlk" data-act="go2" data-arg="schema:Pensare semplice"><span>Apri la card completa</span><span class="chev">›</span></div>' +
       '<div class="wchk"><div class="wchead">✅ Prima di inviare, controlla</div>' + chk + '</div>' +
       '<div class="wchead" style="margin-top:14px">🧭 Cosa vuoi dire?</div><div class="chips wchips">' + chips + '</div>' + panel + '</div></div>' +
-      '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti<span class="cdesc">gli errori che ripeto, divisi per argomento</span></span><span class="chev">›</span></div></div>';
+      '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti</span><span class="chev">›</span></div></div>';
   }
   function homeBody(term) {
     if (term && term.trim()) return searchAll(term.trim().toLowerCase());
@@ -858,7 +880,7 @@
       tile('flashcard', '🃏', 'Flashcard', 'Ripassa') +
       tile('componi', '✍️', 'Frase del giorno', 'Esercitati') +
       tile('canzoni', '🎵', 'Canzoni', D.canzoni.length + ' brani') +
-      tile('racconti', '📖', 'Racconti', D.racconti.length + ' testi') +
+      tile('racconti', '📖', 'Testi', D.racconti.length + ' racconti, ' + (D.schemi || []).filter(function (x) { return isConv(x.title); }).length + ' conversazioni') +
       '</div>' +
       '<div class="hgroup">Copia dei miei dati</div><button class="bigbtn alt" data-act="bakexp">⬇︎ Salva tutto (discorsi, note, evidenziate…)</button>' +
       '<label class="bigbtn alt implabel">⬆︎ Ripristina da un file<input type="file" accept=".json,application/json" id="bakimp" hidden></label>' +
@@ -921,7 +943,7 @@
     if (e.good) body += '<div class="dbox dgd"><b>⭐ Punti forti</b>' + esc(e.good) + '</div>';
     var snD = (snipTerm && !open) ? snippet([e.theirs, e.mine, e.fixed, (e.notes || []).join(' '), e.good].join(' · '), snipTerm) : '';
     return '<div class="card ' + (open ? 'open' : '') + '"><div class="head" data-act="dopen" data-arg="' + esc(e.id) + '"><span class="ctitle">' + esc((e.who ? e.who + ' — ' : '') + e.topic) +
-      '<span class="cdesc' + (snD ? ' snip' : '') + '">' + (snD ? esc(snD) : (e.date ? esc(diaDate(e.date)) + ' · ' : '') + (e.mine ? 'come ho scritto → versione corretta' : 'la mia risposta')) + '</span></span><span class="chev">›</span></div>' +
+      (snD ? '<span class="cdesc snip">' + esc(snD) + '</span>' : '') + '</span><span class="chev">›</span></div>' +
       '<div class="body"><div class="body-in">' + body + noteBlock('d:' + e.id) + '</div></div></div>';
   }
   function diarioBody(term) {
@@ -954,7 +976,7 @@
     var cc = D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return sm(x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' '), t); });
     if (cc.length) out += '<div class="hgroup">Racconti (' + cc.length + ')</div>' + cc.map(function (x) { var m = x.s.title.match(/^(.*?)\s*\(/); return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(m ? m[1].trim() : x.s.title) + '</span><span class="chev">›</span></div></div>'; }).join('');
     var sb = schemiBody(t, true);
-    if (sb.indexOf('class="empty"') < 0) out += '<div class="hgroup">Schemi (' + (sb.match(/class="schemecard/g) || []).length + ')</div>' + sb;
+    if (sb.indexOf('class="empty"') < 0) out += '<div class="hgroup">Schemi e conversazioni (' + (sb.match(/class="schemecard/g) || []).length + ')</div>' + sb;
     var nn = Object.keys(notes).filter(function (k) { return notes[k] && sm((notes[k] + ' ' + noteLabel(k)), t); });
     if (nn.length) out += '<div class="hgroup">Le mie note (' + nn.length + ')</div>' + nn.map(function (k) { return '<div class="hgroup" style="font-size:12px">' + esc(noteLabel(k)) + '</div>' + noteBlock(k); }).join('');
     var tm = (D.tempi || []).filter(function (x) { return sm(JSON.stringify(x), t); });
@@ -1085,13 +1107,14 @@
     else if (act === 'dopen') { var cdd = el.closest('.card'), dOpen = cdd ? cdd.classList.contains('open') : diaOpen.has(arg); if (dOpen) { diaOpen.delete(arg); if (cdd) cdd.classList.remove('open'); } else { diaOpen.add(arg); if (cdd) cdd.classList.add('open'); } }
     else if (act === 'srchwide') { searchInside = true; var qw = document.getElementById('q'), bw = document.getElementById('body'); if (qw && bw) runSearch(qw.value, bw); }
     else if (act === 'vochard') { vocHard = !vocHard; var qv = document.getElementById('q'); var bv = document.getElementById('body'); if (bv) bv.innerHTML = vocabBody(qv ? qv.value : ''); }
+    else if (act === 'testitab') { testiTab = arg; var qt = document.getElementById('q'); if (qt) qt.value = ''; var bt = document.getElementById('body'); if (bt) bt.innerHTML = testiBody(''); window.scrollTo(0, 0); }
     else if (act === 'wtoggle') { var wb = el.closest('.wbox'); wOpen = !(wb && wb.classList.contains('open')); if (wb) wb.classList.toggle('open', wOpen); }
     else if (act === 'wchip') { wgroup = (wgroup === arg) ? '' : arg; var hb = document.getElementById('body'); if (hb) hb.innerHTML = homeBody(''); }
     else if (act === 'wlink') { wgroup = arg; go('home'); setTimeout(function () { var wb = document.getElementById('wbox'); if (wb) wb.scrollIntoView({ block: 'start' }); }, 60); }
     else if (act === 'tent') { var trw = el.closest('tr'); if (trw) trw.classList.toggle('tentopen'); }
     else if (act === 'ruleord') { ruleOrd = ruleOrd === 'az' ? 'cat' : 'az'; save('ruleOrd', ruleOrd); var qr = document.getElementById('q'); var br = document.getElementById('body'); if (br) br.innerHTML = regoleBody(qr ? qr.value : ''); window.scrollTo(0, 0); }
-    else if (act === 'schord') { schOrd = schOrd === 'az' ? 'orig' : 'az'; save('schOrd', schOrd); var qo = document.getElementById('q'); var bo = document.getElementById('body'); if (bo) bo.innerHTML = schemiBody(qo ? qo.value : ''); window.scrollTo(0, 0); }
-    else if (act === 'schcat') { schCat = arg; save('schCat', schCat); var qs = document.getElementById('q'); var bs = document.getElementById('body'); if (bs) bs.innerHTML = schemiBody(qs ? qs.value : ''); window.scrollTo(0, 0); }
+    else if (act === 'schord') { schOrd = schOrd === 'az' ? 'orig' : 'az'; save('schOrd', schOrd); var qo = document.getElementById('q'); var bo = document.getElementById('body'); if (bo) bo.innerHTML = (route.name === 'racconti' ? testiBody : schemiBody)(qo ? qo.value : ''); window.scrollTo(0, 0); }
+    else if (act === 'schcat') { if (route.name === 'racconti') convCat = arg; else { schCat = arg; save('schCat', schCat); } var qs = document.getElementById('q'); var bs = document.getElementById('body'); if (bs) bs.innerHTML = (route.name === 'racconti' ? testiBody : schemiBody)(qs ? qs.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regtag') { regTag = arg; var qc3 = document.getElementById('q'); var bc3 = document.getElementById('body'); if (bc3) bc3.innerHTML = regoleBody(qc3 ? qc3.value : ''); window.scrollTo(0, 0); }
     else if (act === 'ruletag') {
@@ -1239,6 +1262,7 @@
     else if (route.name === 'phrasal') b.innerHTML = phrasalBody(term);
     else if (route.name === 'irregolari') b.innerHTML = irregolariBody(term);
     else if (route.name === 'schemi') b.innerHTML = schemiBody(term);
+    else if (route.name === 'racconti') b.innerHTML = testiBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
     else if (route.name === 'diario') b.innerHTML = diarioBody(term);
     highlight(b, term); snipTerm = '';
