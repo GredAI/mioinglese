@@ -354,3 +354,12 @@ tr.tentopen .tent{display:block}
 .dbox{border-radius:12px;padding:10px 12px;margin:8px 0;font-size:14px;line-height:1.45}.dbox b{display:block;font-size:12px;letter-spacing:.4px;text-transform:uppercase;margin-bottom:3px}.dbox i{display:block;margin-top:4px;opacity:.85}
 .dth{background:#f1f2f5;color:#3a3a40}.dmi{background:#fdeaea;color:#8f1d1d}.dfx{background:#eaf4e0;color:#2b5a0e}.dgd{background:#fff5cc;color:#6b5200}
 .dnotes{margin:8px 0}.dnotes>b{font-size:12px;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}.dn{background:#e6f0fd;color:#0b3d7a;border-radius:10px;padding:7px 10px;margin:5px 0;font-size:13px;font-weight:600}
+
+/* v112 · Il mio spazio, Pensare semplice chiuso, frammenti di ricerca */
+.myspace{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px}
+.mini{background:var(--card);border-radius:12px;box-shadow:0 1px 3px rgba(0,0,0,.06);padding:8px 2px;display:flex;flex-direction:column;align-items:center;gap:1px;cursor:pointer;text-align:center}
+.mini:active{opacity:.7}.mini .mi{font-size:20px}.mini .ml{font-size:11px;font-weight:600}.mini .mn{font-size:11px;color:var(--muted)}
+.wbox .wbody{display:none}.wbox.open .wbody{display:block}
+.wbox .whead{margin-bottom:0}.wbox.open .whead{margin-bottom:8px}
+.wbox .whead .chev{font-size:20px;color:#c4c4c9;transition:transform .2s}.wbox.open .whead .chev{transform:rotate(90deg)}
+.cdesc.snip{font-size:12.5px;line-height:1.35}

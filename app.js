@@ -41,7 +41,17 @@
   function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function posm(s) { return s.replace(/\[\[(.+?)\]\]/g, '<mark class="pos">$1</mark>'); }
   /* ricerca: parola intera (termini fino a 3 lettere) o inizio parola (4+), con possibilità di allargare */
-  var searchInside = false, smMiss = 0, smCache = {}, lastTerm = '';
+  var searchInside = false, smMiss = 0, smCache = {}, lastTerm = '', snipTerm = '';
+  // frammento di testo attorno alla parola cercata (per i risultati chiusi)
+  function snippet(hay, t) {
+    hay = String(hay).replace(/\*\*|\[\[|\]\]|§|\u0001|\u0002/g, '').replace(/\s+/g, ' '); var k = (t || '').trim().toLowerCase(); if (!k) return '';
+    var low = hay.toLowerCase(), idx = -1, m;
+    if (!searchInside && (m = smRe(k).exec(low))) idx = m.index + m[1].length; else idx = low.indexOf(k);
+    if (idx < 0) idx = low.indexOf(k); if (idx < 0) return '';
+    var a = Math.max(0, idx - 30), b = Math.min(hay.length, idx + k.length + 55);
+    if (a > 0) { var sp = hay.indexOf(' ', a); if (sp > 0 && sp < idx) a = sp + 1; }
+    return (a > 0 ? '… ' : '') + hay.slice(a, b) + (b < hay.length ? ' …' : '');
+  }
   function smRe(t) {
     var k = t.trim(); if (smCache[k]) return smCache[k];
     var e = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), L = 'a-zà-ÿ0-9';
@@ -286,9 +296,10 @@
       return '<button class="tagbtn' + (on ? ' on' : '') + '" style="' + (on ? 'background:' + tg.color + ';color:#fff' : '') + '" data-act="ruletag" data-arg="' + r.n + ':' + k + '">' + tg.icon + ' ' + tg.label + '</button>';
     }).join('') + '</div>';
     var rci = Math.max(0, (D.catOrder || []).indexOf(r.cat));
+    if (snipTerm && !open && r.title.toLowerCase().indexOf(snipTerm) < 0) { var sn = snippet(vis.map(function (i) { return i.s || ''; }).join(' · '), snipTerm); if (sn) desc = sn; }
     return '<div class="card rc' + rci + ' ' + (open ? 'open' : '') + '" data-rule="' + r.n + '">' +
       '<div class="head" data-act="rule" data-arg="' + r.n + '"><span class="num">' + r.n + '</span>' +
-      '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc">' + esc(r.short ? desc : desc.slice(0, 70) + (desc.length > 70 ? '…' : '')) + '</span>') + '</span>' +
+      '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc' + (snipTerm ? ' snip' : '') + '">' + esc(snipTerm || r.short ? desc : desc.slice(0, 70) + (desc.length > 70 ? '…' : '')) + '</span>') + '</span>' +
       dot + favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
       '<div class="body"><div class="body-in">' + tagbar + body + ruleLink(r.n) + noteBlock('r' + r.n) + '</div></div></div>';
   }
@@ -367,7 +378,7 @@
   var regCat = 'all'; // categoria selezionata nel tab Regole
   var regTag = 'all'; // marcatore selezionato nel tab Regole (all/use/want/learn)
   function regoleBody(term) {
-    var t = term.toLowerCase();
+    var t = term.toLowerCase(); snipTerm = t.trim();
     var cats = D.catOrder || [];
     function match(r) { return !t || sm((r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')), t); }
     var matched = D.rules.filter(match);
@@ -490,7 +501,7 @@
       var body = '';
       if (b.type === 'rows') {
         body = b.rows.map(function (r) {
-          return '<div class="vrow c-' + (r.c || 'g') + '"><span class="vl">' + eh(r.label) + '</span><span class="vk">' + eh(r.key) + '</span><span class="vx">' + eh(r.ex || '') + (r.it ? '<br><i>' + eh(r.it) + '</i>' : '') + '</span></div>';
+          return '<div class="vrow c-' + (r.c || 'g') + '"><span class="vl">' + eh(r.label) + '</span><span class="vk">' + eh(r.key) + '</span><span class="vx">' + eh(r.ex || '') + (r.it ? (r.ex ? '<br>' : '') + '<i>' + eh(r.it) + '</i>' : '') + '</span></div>';
         }).join('');
       } else if (b.type === 'flow') {
         body = b.rows.map(function (r) {
@@ -514,6 +525,7 @@
     }).join('');
   }
   function blocksText(blocks) { return JSON.stringify(blocks.map(function (b) { return Object.assign({}, b, { svg: undefined }); })).replace(/[{}\[\]":,]|\b(type|rows|cols|cells|label|key|ex|sub|note|h|t|s|c)\b/g, ' ').toLowerCase(); }
+  function blocksPlain(bl) { var out = []; (function w(x, k) { if (typeof x === 'string') { if (k !== 'c' && k !== 'type' && k !== 'svg' && k !== 'n') out.push(x); } else if (Array.isArray(x)) x.forEach(function (y) { w(y, k); }); else if (x && typeof x === 'object') Object.keys(x).forEach(function (kk) { w(x[kk], kk); }); })(bl, ''); return out.join(' · '); }
   function hkey(s, ri) { return s.title + '||' + ri; }
   function hiParse(k) {
     var j = k.lastIndexOf('||'); if (j < 0) return null;
@@ -572,7 +584,7 @@
   }
   function azKey(s) { return s.replace(/^[^A-Za-z0-9À-ÿ]+/, ''); }
   function schemiBody(term, raw) {
-    var t = (term || '').toLowerCase().trim();
+    var t = (term || '').toLowerCase().trim(); if (!raw) snipTerm = t;
     var counts = {}; (D.schemi || []).forEach(function (s) { var c = schemaCat(s.title); counts[c] = (counts[c] || 0) + 1; });
     var chipbar = raw ? '' : '<div class="chips"><button class="chip2 ' + (schOrd === 'az' ? 'on' : '') + '" data-act="schord">🔤 A–Z</button>' + SCH_CATS.map(function (c) {
       var n = c === 'Tutti' ? (D.schemi || []).length : c === 'Evidenziate' ? hiCount() : (counts[c] || 0);
@@ -583,9 +595,10 @@
       if (!raw && !t && schCat !== 'Tutti' && schemaCat(s.title) !== schCat) return '';
       if (s.blocks) {
         if (t && !sm(s.title, t) && !sm(blocksText(s.blocks), t)) return '';
-        var op = t ? true : openSchemi.has(i);
+        var op = openSchemi.has(i);
+        var snB = (t && !op && s.title.toLowerCase().indexOf(t) < 0) ? snippet(blocksPlain(s.blocks), t) : '';
         return '<div class="schemecard ' + schCls(s.title) + (op ? ' open' : '') + '" data-schema="' + i + '">' +
-          '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
+          '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + (snB ? '<span class="cdesc snip">' + esc(snB) + '</span>' : '') + '</span><span class="chev">›</span></div>' +
           '<div class="sbody"><div class="vwrap">' + blocksHtml(s.blocks) + '</div>' + (s.note ? '<div class="schemenote">' + eh(s.note) + '</div>' : '') + noteBlock('s:' + s.title) + '</div></div>';
       }
       var titleHit = t && sm(s.title, t);
@@ -608,9 +621,10 @@
         }).join('') + '<td class="scrtd">' + (hideT ? '<button class="tentbtn" data-act="tent" aria-label="Mostra il mio tentativo">✗</button>' : '') + '<button class="scradd" data-act="scradd" data-arg="' + esc(key).replace(/"/g, '&quot;') + '" aria-label="Aggiungi a un discorso">＋</button></td></tr>';
       }).join('');
       if (t && !shown && !(s.note && sm(s.note, t))) return '';
-      var open = t ? true : openSchemi.has(i); // durante la ricerca le card trovate si aprono da sole
+      var open = openSchemi.has(i); // durante la ricerca le card restano chiuse, con un frammento di testo
+      var snT = (t && !open && !titleHit) ? snippet(s.rows.filter(function (r) { return String(r[0]).charAt(0) !== '§'; }).map(function (r) { return r.join(' · '); }).join(' | ') + ' ' + (s.note || ''), t) : '';
       return '<div class="schemecard ' + schCls(s.title) + (open ? ' open' : '') + '" data-schema="' + i + '">' +
-        '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
+        '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + (snT ? '<span class="cdesc snip">' + esc(snT) + '</span>' : '') + '</span><span class="chev">›</span></div>' +
         '<div class="sbody"><div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
         '<button class="lmini scrbulk" data-act="scrbulk" data-arg="' + i + '">＋ Aggiungi le righe evidenziate di questa card a un discorso</button>' +
         (s.note ? '<div class="schemenote">' + eh(s.note) + '</div>' : '') + noteBlock('s:' + s.title) +
@@ -791,11 +805,11 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v111</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v112</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
-  var wgroup = '';
+  var wgroup = '', wOpen = false;
   function linkTitle(l) {
     if (l[0] === 's') { var i = schemaIdx(l[1]); return i < 0 ? null : { t: D.schemi[i].title, a: 'schema:' + l[1] }; }
     var r = D.rules.filter(function (x) { return x.n === l[1]; })[0]; return r ? { t: 'Regola ' + r.n + ' — ' + r.title, a: 'rule:' + r.n } : null;
@@ -816,26 +830,24 @@
         return '<div class="wlk" data-act="go2" data-arg="' + esc(x.a).replace(/"/g, '&quot;') + '"><span>' + esc(x.t) + '</span><span class="chev">›</span></div>';
       }).join('') + '</div>';
     });
-    return '<div class="hgroup">Per scrivere bene</div><div class="wbox" id="wbox">' +
-      '<div class="whead" data-act="go2" data-arg="schema:Pensare semplice"><b>🧠 Pensare semplice</b><span>apri la card ›</span></div>' + steps +
+    return '<div class="hgroup">Per scrivere bene</div><div class="wbox' + (wOpen ? ' open' : '') + '" id="wbox">' +
+      '<div class="whead" data-act="wtoggle"><b>🧠 Pensare semplice</b><span class="chev">›</span></div><div class="wbody">' + steps +
+      '<div class="wlk" data-act="go2" data-arg="schema:Pensare semplice"><span>Apri la card completa</span><span class="chev">›</span></div>' +
       '<div class="wchk"><div class="wchead">✅ Prima di inviare, controlla</div>' + chk + '</div>' +
-      '<div class="wchead" style="margin-top:14px">🧭 Cosa vuoi dire?</div><div class="chips wchips">' + chips + '</div>' + panel + '</div>' +
+      '<div class="wchead" style="margin-top:14px">🧭 Cosa vuoi dire?</div><div class="chips wchips">' + chips + '</div>' + panel + '</div></div>' +
       '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti<span class="cdesc">gli errori che ripeto, divisi per argomento</span></span><span class="chev">›</span></div></div>';
   }
   function homeBody(term) {
     if (term && term.trim()) return searchAll(term.trim().toLowerCase());
     var out = '<div class="homebtns"><button class="hbtn" data-act="go" data-arg="flashcard">▶︎ Riprendi studio</button>' +
       '<button class="hbtn alt" data-act="go" data-arg="componi">✎ Frase del giorno</button></div>' + writeBox();
-    if (recent.length) {
-      out += '<div class="hgroup">Ultime aperte</div>';
-      out += recent.map(function (r) { return '<div class="card" data-act="go2" data-arg="' + r.id + '"><div class="head"><span class="ctitle">' + esc(r.label) + '</span><span class="chev">›</span></div></div>'; }).join('');
-    }
+    out += '<div class="hgroup">Il mio spazio</div><div class="myspace">' +
+      mini('discorsi', '🗣', 'Discorsi', scripts.length) + mini('diario', '📔', 'Diario', (D.diario || []).length) +
+      mini('note', '📝', 'Note', Object.keys(notes).filter(function (k) { return notes[k]; }).length) +
+      '<div class="mini" data-act="hi"><span class="mi">⭐</span><span class="ml">Evidenziate</span><span class="mn">' + hiCount() + '</span></div>' +
+      mini('preferiti', '❤️', 'Preferiti', fav.size) + '</div>';
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
-      tile('discorsi', '🗣', 'I miei discorsi', scripts.length + ' discorsi') +
-      tile('diario', '📔', 'Diario', (D.diario || []).length + ' conversazioni') +
-      tile('note', '📝', 'Le mie note', Object.keys(notes).filter(function (k) { return notes[k]; }).length + ' note') +
-      '<div class="tile" data-act="hi"><div class="ti">⭐</div><div class="tl">Evidenziate</div><div class="ts">' + hiCount() + ' frasi</div></div>' +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
       tile('ascolto', '🎧', 'Ascolto', 'playlist, timer, audio') +
       tile('tempi', '⏳', 'Tempi verbali', (D.tempi ? D.tempi.length : 0) + ' tempi, attivo e passivo') +
@@ -847,12 +859,14 @@
       tile('componi', '✍️', 'Frase del giorno', 'Esercitati') +
       tile('canzoni', '🎵', 'Canzoni', D.canzoni.length + ' brani') +
       tile('racconti', '📖', 'Racconti', D.racconti.length + ' testi') +
-      tile('preferiti', '⭐', 'Preferiti', fav.size + ' salvati') +
       '</div>' +
       '<div class="hgroup">Copia dei miei dati</div><button class="bigbtn alt" data-act="bakexp">⬇︎ Salva tutto (discorsi, note, evidenziate…)</button>' +
       '<label class="bigbtn alt implabel">⬆︎ Ripristina da un file<input type="file" accept=".json,application/json" id="bakimp" hidden></label>' +
       '<div class="lnote">«Salva tutto» crea un solo file con tutto ciò che hai fatto nell\'app. «Ripristina» lo rimette su qualunque dispositivo, senza cancellare ciò che c\'è già.</div>';
     return out;
+  }
+  function mini(id, ic, label, n) {
+    return '<div class="mini" data-act="go" data-arg="' + id + '"><span class="mi">' + ic + '</span><span class="ml">' + label + '</span><span class="mn">' + n + '</span></div>';
   }
   function tile(id, ic, label, sub) {
     return '<div class="tile" data-act="go" data-arg="' + id + '"><div class="ti">' + ic + '</div><div class="tl">' + label + '</div><div class="ts">' + sub + '</div></div>';
@@ -905,26 +919,28 @@
     if (e.fixed) body += '<div class="dbox dfx"><b>✓ ' + (e.mine ? 'Corretta' : 'La mia risposta') + '</b>' + esc(e.fixed) + '</div>';
     if (e.notes && e.notes.length) body += '<div class="dnotes"><b>Cosa è cambiato</b>' + e.notes.map(function (n) { return '<div class="dn">' + esc(n) + '</div>'; }).join('') + '</div>';
     if (e.good) body += '<div class="dbox dgd"><b>⭐ Punti forti</b>' + esc(e.good) + '</div>';
+    var snD = (snipTerm && !open) ? snippet([e.theirs, e.mine, e.fixed, (e.notes || []).join(' '), e.good].join(' · '), snipTerm) : '';
     return '<div class="card ' + (open ? 'open' : '') + '"><div class="head" data-act="dopen" data-arg="' + esc(e.id) + '"><span class="ctitle">' + esc((e.who ? e.who + ' — ' : '') + e.topic) +
-      '<span class="cdesc">' + (e.date ? esc(diaDate(e.date)) + ' · ' : '') + (e.mine ? 'come ho scritto → versione corretta' : 'la mia risposta') + '</span></span><span class="chev">›</span></div>' +
+      '<span class="cdesc' + (snD ? ' snip' : '') + '">' + (snD ? esc(snD) : (e.date ? esc(diaDate(e.date)) + ' · ' : '') + (e.mine ? 'come ho scritto → versione corretta' : 'la mia risposta')) + '</span></span><span class="chev">›</span></div>' +
       '<div class="body"><div class="body-in">' + body + noteBlock('d:' + e.id) + '</div></div></div>';
   }
   function diarioBody(term) {
-    var t = (term || '').toLowerCase();
+    var t = (term || '').toLowerCase(); snipTerm = t.trim();
     var list = (D.diario || []).filter(function (e) { return !t || sm(JSON.stringify(e), t); }).slice().sort(function (a, b) { return b.part - a.part || (b.date || '').localeCompare(a.date || ''); });
     var out = t ? '' : '<div class="lnote">Qui tengo la cronologia delle conversazioni: con chi, cosa ho scritto, la versione corretta e cosa è cambiato. Si aggiunge una voce a ogni nuova parte; per studiare usa Regole, Schemi e Vocabolario.</div>';
     if (!list.length) return out + '<div class="empty">Nessuna voce trovata.</div>';
     var last = null;
     list.forEach(function (e) {
       if (e.part !== last) { out += '<div class="hgroup">Parte ' + e.part + (e.date ? ' · ' + esc(diaDate(e.date)) : '') + '</div>'; last = e.part; }
-      out += diarioCard(e, diaOpen.has(e.id) || !!t);
+      out += diarioCard(e, diaOpen.has(e.id));
     });
     return out;
   }
   function searchAll(t) {
+    snipTerm = t.trim().toLowerCase();
     var out = (t.indexOf(' ') < 0 ? verbCard(t) : '');
     var dd = (D.diario || []).filter(function (e) { return sm(JSON.stringify(e), t); });
-    var diaOut = dd.length ? '<div class="hgroup">Diario (' + dd.length + ')</div>' + dd.map(function (e) { return diarioCard(e, true); }).join('') : '';
+    var diaOut = dd.length ? '<div class="hgroup">Diario (' + dd.length + ')</div>' + dd.map(function (e) { return diarioCard(e, diaOpen.has(e.id)); }).join('') : '';
     var rr = D.rules.filter(function (r) { return sm((r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')), t); });
     if (rr.length) out += '<div class="hgroup">Regole (' + rr.length + ')</div>' + rr.map(function (r) { return ruleCard(r, openRules.has(r.n)); }).join('');
     var vv = D.vocab.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return sm((x.d.en + ' ' + x.d.it), t); });
@@ -967,7 +983,7 @@
   }
 
   /* ---------- render + events ---------- */
-  function render() { document.getElementById('screen').innerHTML = screenHtml(); renderTabs(); if (route.name === 'ascolto') lpStatus(); }
+  function render() { snipTerm = ''; document.getElementById('screen').innerHTML = screenHtml(); renderTabs(); if (route.name === 'ascolto') lpStatus(); }
   function go(name, arg) { route = { name: name, arg: arg }; window.scrollTo(0, 0); render(); }
 
   function onAct(e, el) {
@@ -981,7 +997,8 @@
     else if (act === 'rule') {
       // apri/chiudi la card SUL POSTO, senza ricostruire la schermata (niente salto di scroll)
       var n = +arg, cardEl = el.closest('.card');
-      if (openRules.has(n)) { openRules.delete(n); if (cardEl) cardEl.classList.remove('open'); }
+      var rOpen = cardEl ? cardEl.classList.contains('open') : openRules.has(n);
+      if (rOpen) { openRules.delete(n); if (cardEl) cardEl.classList.remove('open'); }
       else {
         openRules.add(n); if (cardEl) cardEl.classList.add('open');
         var r = D.rules.find(function (x) { return x.n === n; });
@@ -992,13 +1009,15 @@
     else if (act === 'schema') {
       // apri/chiudi la card dello schema SUL POSTO, senza ricostruire la schermata
       var si = +arg, schemaEl = el.closest('.schemecard');
-      if (openSchemi.has(si)) { openSchemi.delete(si); if (schemaEl) schemaEl.classList.remove('open'); }
+      var sOpen = schemaEl ? schemaEl.classList.contains('open') : openSchemi.has(si);
+      if (sOpen) { openSchemi.delete(si); if (schemaEl) schemaEl.classList.remove('open'); }
       else { openSchemi.add(si); if (schemaEl) schemaEl.classList.add('open'); }
     }
     else if (act === 'tempo') {
       // apri/chiudi la card del tempo verbale SUL POSTO, senza ricostruire la schermata
       var ti = +arg, tempoEl = el.closest('.schemecard');
-      if (openTempi.has(ti)) { openTempi.delete(ti); if (tempoEl) tempoEl.classList.remove('open'); }
+      var tOpen = tempoEl ? tempoEl.classList.contains('open') : openTempi.has(ti);
+      if (tOpen) { openTempi.delete(ti); if (tempoEl) tempoEl.classList.remove('open'); }
       else { openTempi.add(ti); if (tempoEl) tempoEl.classList.add('open'); }
     }
     else if (act === 'schemarow') {
@@ -1063,9 +1082,10 @@
       try { var na = document.createElement('a'); na.href = URL.createObjectURL(new Blob([JSON.stringify(exp, null, 1)], { type: 'application/json' })); na.download = 'note.json'; document.body.appendChild(na); na.click(); na.remove(); } catch (er) {}
     }
     else if (act === 'hi') { schCat = 'Evidenziate'; save('schCat', schCat); go('schemi'); }
-    else if (act === 'dopen') { var cdd = el.closest('.card'); if (diaOpen.has(arg)) { diaOpen.delete(arg); if (cdd) cdd.classList.remove('open'); } else { diaOpen.add(arg); if (cdd) cdd.classList.add('open'); } }
+    else if (act === 'dopen') { var cdd = el.closest('.card'), dOpen = cdd ? cdd.classList.contains('open') : diaOpen.has(arg); if (dOpen) { diaOpen.delete(arg); if (cdd) cdd.classList.remove('open'); } else { diaOpen.add(arg); if (cdd) cdd.classList.add('open'); } }
     else if (act === 'srchwide') { searchInside = true; var qw = document.getElementById('q'), bw = document.getElementById('body'); if (qw && bw) runSearch(qw.value, bw); }
     else if (act === 'vochard') { vocHard = !vocHard; var qv = document.getElementById('q'); var bv = document.getElementById('body'); if (bv) bv.innerHTML = vocabBody(qv ? qv.value : ''); }
+    else if (act === 'wtoggle') { var wb = el.closest('.wbox'); wOpen = !(wb && wb.classList.contains('open')); if (wb) wb.classList.toggle('open', wOpen); }
     else if (act === 'wchip') { wgroup = (wgroup === arg) ? '' : arg; var hb = document.getElementById('body'); if (hb) hb.innerHTML = homeBody(''); }
     else if (act === 'wlink') { wgroup = arg; go('home'); setTimeout(function () { var wb = document.getElementById('wbox'); if (wb) wb.scrollIntoView({ block: 'start' }); }, 60); }
     else if (act === 'tent') { var trw = el.closest('tr'); if (trw) trw.classList.toggle('tentopen'); }
@@ -1211,7 +1231,7 @@
     runSearch(term, b);
   });
   function runSearch(term, b) {
-    smMiss = 0;
+    smMiss = 0; snipTerm = (term || '').trim().toLowerCase();
     if (route.name === 'home') b.innerHTML = homeBody(term);
     else if (route.name === 'regole') b.innerHTML = regoleBody(term);
     else if (route.name === 'vocab') b.innerHTML = vocabBody(term);
@@ -1221,7 +1241,7 @@
     else if (route.name === 'schemi') b.innerHTML = schemiBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
     else if (route.name === 'diario') b.innerHTML = diarioBody(term);
-    highlight(b, term);
+    highlight(b, term); snipTerm = '';
     if (term.trim() && b.querySelector('.empty')) {
       var q = 'Come si dice in inglese (o cosa significa): ' + term.trim() + '? Rispondi in modo breve, con un esempio.';
       b.insertAdjacentHTML('beforeend', '<a class="askclaude" href="https://claude.ai/new?q=' + encodeURIComponent(q) + '" target="_blank" rel="noopener">✨ Chiedi a Claude: “' + esc(term.trim()) + '”</a>');
