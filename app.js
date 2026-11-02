@@ -2,6 +2,21 @@
 (function () {
   'use strict';
   var D = window.DATA;
+  // migrazione dati dopo la riorganizzazione (v110): sposta evidenziazioni e note sulle card nuove, azzera le selezioni dell'Ascolto (cambiano gli indici)
+  (function () {
+    try {
+      if (localStorage.getItem('dataVer') === '110') return;
+      var M = (D.home && D.home.migrate) || { hi: {}, notes: {} };
+      var hi = JSON.parse(localStorage.getItem('schemaHi') || '[]'); var nh = {};
+      hi.forEach(function (k) { nh[M.hi[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(nh)));
+      var nt = JSON.parse(localStorage.getItem('notes') || '{}'), out = {};
+      Object.keys(nt).forEach(function (k) { var to = M.notes[k] || k; out[to] = out[to] ? out[to] + '\n' + nt[k] : nt[k]; });
+      localStorage.setItem('notes', JSON.stringify(out));
+      localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl');
+      localStorage.setItem('dataVer', '110');
+    } catch (e) {}
+  })();
+
 
   /* ---------- storage ---------- */
   function load(k, def) { try { return JSON.parse(localStorage.getItem(k)) || def; } catch (e) { return def; } }
@@ -25,7 +40,27 @@
   /* ---------- helpers ---------- */
   function esc(s) { return (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
   function posm(s) { return s.replace(/\[\[(.+?)\]\]/g, '<mark class="pos">$1</mark>'); }
-  function bold(s) { return posm(esc(s).split('**').map(function (x, i) { return i % 2 ? '<strong>' + x + '</strong>' : x; }).join('')); }
+  /* ricerca: parola intera (termini fino a 3 lettere) o inizio parola (4+), con possibilità di allargare */
+  var searchInside = false, smMiss = 0, smCache = {}, lastTerm = '';
+  function smRe(t) {
+    var k = t.trim(); if (smCache[k]) return smCache[k];
+    var e = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), L = 'a-zà-ÿ0-9';
+    return (smCache[k] = new RegExp('(^|[^' + L + '])' + e + (k.length <= 3 ? '(?![' + L + '])' : ''), 'i'));
+  }
+  function sm(hay, t) {
+    hay = String(hay).toLowerCase(); var k = t.trim();
+    if (!k) return true;
+    if (hay.indexOf(k) < 0) return false;
+    if (searchInside) return true;
+    if (smRe(k).test(hay)) return true;
+    smMiss++; return false;
+  }
+  // forme sbagliate (dopo "non", "mai", "NON:", o con ✗) in rosso: sentinelle \u0001 … \u0002 trasformate in <span class="bad">
+  var RXW = /((?:\b(?:[Nn]on|mai)|NON|Non dire|non dire)\s*:?\s*)(["“‘«'][^"”’»'“‘«]{1,60}["”’»'])|(✗\s*[^·✓\n]+?)(?=\s*(?:·|✓|$))|(NON:\s*[^·.)\n]{2,40})/g;
+  function rx(s) { return (s || '').replace(RXW, function (m, a, b, c, d) { if (b) return a + '\u0001' + b + '\u0002'; if (c) return '\u0001' + c + '\u0002'; return '\u0001' + d + '\u0002'; }); }
+  function fin(h) { return h.replace(/\u0001/g, '<span class="bad">').replace(/\u0002/g, '</span>'); }
+  function eh(s) { return fin(esc(rx(s))); }
+  function bold(s) { return fin(posm(esc(rx(s)).split('**').map(function (x, i) { return i % 2 ? '<strong>' + x + '</strong>' : x; }).join(''))); }
   function markedHtml(t) {
     var s = esc(t).split('//').join('').split('/').join('');
     s = s.replace(/\*\*(.+?)\*\*/g, '<b class="st">$1</b>');
@@ -215,6 +250,7 @@
   function noteLabel(id) {
     if (id.charAt(0) === 'r') { var r = D.rules.filter(function (x) { return 'r' + x.n === id; })[0]; return r ? 'Regola ' + r.n + ' — ' + r.title : id; }
     if (id.indexOf('s:') === 0) return 'Schema — ' + id.slice(2);
+    if (id.indexOf('d:') === 0) { var de = (D.diario || []).filter(function (x) { return x.id === id.slice(2); })[0]; return 'Diario — ' + (de ? de.topic : id.slice(2)); }
     return id;
   }
   function noteScreen() {
@@ -236,36 +272,42 @@
   }
   function ruleCard(r, open) {
     var vis = r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; });
-    var desc = (vis[0] && vis[0].s ? vis[0].s.replace(/\*\*|\[\[|\]\]/g, '') : '');
+    var desc = r.short || (vis[0] && vis[0].s ? vis[0].s.replace(/\*\*|\[\[|\]\]/g, '') : '');
     var chars = vis.map(function (i) { return i.s || ''; }).join(' ').length;
     var lunga = chars > 500 ? '<span class="lunga">LUNGA</span>' : '';
     var tag = ruleTag[r.n];
     var dot = tag ? '<span class="tagdot" style="background:' + RULE_TAGS[tag].color + '" title="' + esc(RULE_TAGS[tag].label) + '"></span>' : '';
     var body = vis.map(function (it) {
       if (it.t === 'exp') return '<p class="exp">' + bold(it.s) + '</p>';
-      return '<div class="exline ' + it.t + '"><b>' + (it.t === 'wrong' ? '✗' : '✓') + '</b><span>' + posm(esc(it.s)) + '</span></div>';
+      return '<div class="exline ' + it.t + '"><b>' + (it.t === 'wrong' ? '✗' : '✓') + '</b><span>' + bold(it.s) + '</span></div>';
     }).join('');
     var tagbar = '<div class="tagbar">' + RULE_TAG_ORDER.map(function (k) {
       var on = tag === k, tg = RULE_TAGS[k];
       return '<button class="tagbtn' + (on ? ' on' : '') + '" style="' + (on ? 'background:' + tg.color + ';color:#fff' : '') + '" data-act="ruletag" data-arg="' + r.n + ':' + k + '">' + tg.icon + ' ' + tg.label + '</button>';
     }).join('') + '</div>';
-    return '<div class="card ' + (open ? 'open' : '') + '" data-rule="' + r.n + '">' +
+    var rci = Math.max(0, (D.catOrder || []).indexOf(r.cat));
+    return '<div class="card rc' + rci + ' ' + (open ? 'open' : '') + '" data-rule="' + r.n + '">' +
       '<div class="head" data-act="rule" data-arg="' + r.n + '"><span class="num">' + r.n + '</span>' +
-      '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc">' + esc(desc.slice(0, 70)) + (desc.length > 70 ? '…' : '') + '</span>') + '</span>' +
+      '<span class="ctitle">' + esc(r.title) + lunga + (open ? '' : '<span class="cdesc">' + esc(r.short ? desc : desc.slice(0, 70) + (desc.length > 70 ? '…' : '')) + '</span>') + '</span>' +
       dot + favBtn('r' + r.n) + '<span class="chev">›</span></div>' +
-      '<div class="body"><div class="body-in">' + tagbar + body + noteBlock('r' + r.n) + '</div></div></div>';
+      '<div class="body"><div class="body-in">' + tagbar + body + ruleLink(r.n) + noteBlock('r' + r.n) + '</div></div></div>';
+  }
+  function ruleLink(n) {
+    var g = (D.home && D.home.ruleGroup || {})[n]; if (!g) return '';
+    return '<button class="lmini wlink" data-act="wlink" data-arg="' + g + '">🧭 Usala per costruire una frase</button>';
   }
   function vsplit(x) {
     x = x || ''; var j = x.indexOf(' | ');
     if (j >= 0) return { pr: x.slice(0, j), ex: x.slice(j + 3) };
     return /[.?!]$/.test(x) ? { pr: '', ex: x } : { pr: x, ex: '' };
   }
+  function vhard(v) { return /^⚠/.test(vsplit(v.extra).pr); }
   function vocRow(v, i) {
-    var sp = vsplit(v.extra);
+    var sp = vsplit(v.extra), hard = /^⚠/.test(sp.pr), prt = sp.pr.replace(/^⚠\s*/, '');
     return '<div class="row">' + speakBtn(v.en.replace(/\(.*?\)/g, '')) +
-      '<div class="main"><div class="line"><span class="en">' + esc(v.en) + '</span>' +
-      (sp.pr ? '<span class="pr">/' + esc(sp.pr) + '/</span>' : '') +
-      '<span class="it">' + esc(v.it) + '</span></div>' + (sp.ex ? '<div class="exq">' + esc(sp.ex) + '</div>' : '') + '</div>' + favBtn('v' + i) + '</div>';
+      '<div class="main"><div class="line"><span class="en">' + (hard ? '<span class="hardmark">⚠️</span> ' : '') + esc(v.en) + '</span>' +
+      (prt ? '<span class="pr">/' + esc(prt) + '/</span>' : '') +
+      '<span class="it">' + esc(v.it) + '</span></div>' + vocChips(v) + (sp.ex ? '<div class="exq">' + esc(sp.ex) + '</div>' : '') + '</div>' + favBtn('v' + i) + '</div>';
   }
   function idiRow(d, i) {
     return '<div class="row"><div class="main"><div class="line"><span class="en">' + esc(d.en) + '</span>' +
@@ -304,6 +346,7 @@
     if (route.name === 'tempi') return tempiScreen();
     if (route.name === 'ascolto') return ascoltoScreen();
     if (route.name === 'note') return noteScreen();
+    if (route.name === 'diario') return listScreen('Diario delle conversazioni', 'Cerca una persona o una parola…', diarioBody, true);
     if (route.name === 'discorsi') return scrListScreen();
     if (route.name === 'discorso') return scrScreen(route.arg);
     if (route.name === 'racc') return raccDetail(route.arg);
@@ -320,15 +363,16 @@
       '<div class="search"><input id="q" type="search" placeholder="' + ph + '" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + bodyFn('') + '</main>';
   }
+  var ruleOrd = load('ruleOrd', 'cat');
   var regCat = 'all'; // categoria selezionata nel tab Regole
   var regTag = 'all'; // marcatore selezionato nel tab Regole (all/use/want/learn)
   function regoleBody(term) {
     var t = term.toLowerCase();
     var cats = D.catOrder || [];
-    function match(r) { return !t || (r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; }
+    function match(r) { return !t || sm((r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')), t); }
     var matched = D.rules.filter(match);
     // barra dei chip (categorie), con conteggio in base alla ricerca
-    var chips = '<button class="chip2 ' + (regCat === 'all' ? 'on' : '') + '" data-act="regcat" data-arg="all">Tutte (' + matched.length + ')</button>';
+    var chips = '<button class="chip2 ' + (ruleOrd === 'az' ? 'on' : '') + '" data-act="ruleord">🔤 A–Z</button><button class="chip2 ' + (regCat === 'all' ? 'on' : '') + '" data-arg="all" data-act="regcat">Tutte (' + matched.length + ')</button>';
     cats.forEach(function (c) {
       var n = matched.filter(function (r) { return r.cat === c; }).length;
       if (!n) return;
@@ -345,6 +389,15 @@
     var tagChipbar = '<div class="chips">' + tagChips + '</div>';
     var shown = matched.filter(function (r) { return (regCat === 'all' || r.cat === regCat) && (regTag === 'all' || ruleTag[r.n] === regTag); });
     if (!shown.length) return chipbar + tagChipbar + '<div class="empty">Nessuna regola trovata.</div>';
+    if (ruleOrd === 'az') {
+      var az = shown.slice().sort(function (a, b) { return azKey(a.title).localeCompare(azKey(b.title), 'it', { numeric: true, sensitivity: 'base' }); }), lastR = '', outA = '';
+      az.forEach(function (r) {
+        var L = (azKey(r.title).charAt(0) || '#').toUpperCase(); if (!/[A-Z]/.test(L)) L = '#';
+        if (L !== lastR) { outA += '<div class="azhead">' + L + '</div>'; lastR = L; }
+        outA += ruleCard(r, openRules.has(r.n));
+      });
+      return chipbar + tagChipbar + outA;
+    }
     // raggruppa per categoria, nell'ordine definito
     var out = '';
     cats.forEach(function (c) {
@@ -355,14 +408,17 @@
     });
     return chipbar + tagChipbar + out;
   }
+  var vocHard = false;
   function vocabBody(term) {
     var t = term.toLowerCase();
-    var arr = D.vocab.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return !t || (x.d.en + ' ' + x.d.it + ' ' + x.d.extra).toLowerCase().indexOf(t) >= 0; });
-    return alphaList(arr, vocRow);
+    var nh = D.vocab.filter(vhard).length;
+    var arr = D.vocab.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (!vocHard || vhard(x.d)) && (!t || sm((x.d.en + ' ' + x.d.it + ' ' + x.d.extra), t)); });
+    var chips = '<div class="chips"><button class="chip2' + (vocHard ? ' on' : '') + '" data-act="vochard">⚠️ Ostiche da pronunciare (' + nh + ')</button></div>';
+    return chips + (t && t.indexOf(' ') < 0 ? verbCard(t) : '') + alphaList(arr, vocRow);
   }
   function frasiBody(term) {
     var t = term.toLowerCase();
-    var arr = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return !t || (x.d.en + ' ' + x.d.it + ' ' + x.d.extra).toLowerCase().indexOf(t) >= 0; });
+    var arr = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return !t || sm((x.d.en + ' ' + x.d.it + ' ' + x.d.extra), t); });
     return alphaList(arr, idiRow);
   }
   function phrRow(d, i) {
@@ -375,14 +431,14 @@
   function irregolariBody(term) {
     var t = term.toLowerCase();
     var arr = (D.irregolari || []).map(function (d, i) { return { d: d, i: i }; })
-      .filter(function (x) { return !t || (x.d.en + ' ' + x.d.it + ' ' + x.d.past + ' ' + x.d.pp).toLowerCase().indexOf(t) >= 0; });
+      .filter(function (x) { return !t || sm((x.d.en + ' ' + x.d.it + ' ' + x.d.past + ' ' + x.d.pp), t); });
     var note = '<div class="schemenote" style="margin:0 4px 10px">Nota: <b>be</b> è irregolare anche al presente (I am · you/we/they are · he/she/it is), was/were al passato. <b>Read</b> si scrive uguale in tutte e tre le forme, ma al passato e al participio si pronuncia come "red".</div>';
     return note + alphaList(arr, verbRow);
   }
   function phrasalBody(term) {
     var t = term.toLowerCase();
     var arr = (D.phrasal || []).map(function (d, i) { return { d: d, i: i }; })
-      .filter(function (x) { return !t || (x.d.pv + ' ' + x.d.it + ' ' + x.d.eq + ' ' + x.d.ex).toLowerCase().indexOf(t) >= 0; });
+      .filter(function (x) { return !t || sm((x.d.pv + ' ' + x.d.it + ' ' + x.d.eq + ' ' + x.d.ex), t); });
     arr.sort(function (a, b) { return keyOf(a.d.pv) < keyOf(b.d.pv) ? -1 : 1; });
     if (!arr.length) return '<div class="empty">Nessun risultato.</div>';
     var out = '', letter = '';
@@ -396,7 +452,7 @@
   function canzoniBody(term) {
     var t = term.toLowerCase();
     return D.canzoni.map(function (s) {
-      var rows = s.items.filter(function (d) { return !t || (d.en + ' ' + d.it + ' ' + d.ex).toLowerCase().indexOf(t) >= 0; });
+      var rows = s.items.filter(function (d) { return !t || sm((d.en + ' ' + d.it + ' ' + d.ex), t); });
       if (!rows.length) return '';
       return '<div class="hgroup">' + esc(s.song) + ' — ' + esc(s.artist) + '</div>' +
         rows.map(function (d) { return '<div class="row"><div class="main"><div class="line"><span class="en">' + esc(d.en) + '</span><span class="it">' + esc(d.it) + '</span></div>' + (d.ex ? '<div class="exq">' + esc(d.ex) + '</div>' : '') + '</div></div>'; }).join('');
@@ -430,32 +486,34 @@
   function saveSchemaHi() { save('schemaHi', Array.from(schemaHi)); }
   function blocksHtml(blocks) {
     return blocks.map(function (b) {
-      var h = (b.h ? '<div class="vbh">' + esc(b.h) + '</div>' : '') + (b.sub ? '<div class="vbs">' + esc(b.sub) + '</div>' : '');
+      var h = (b.h ? '<div class="vbh">' + eh(b.h) + '</div>' : '') + (b.sub ? '<div class="vbs">' + eh(b.sub) + '</div>' : '');
       var body = '';
       if (b.type === 'rows') {
         body = b.rows.map(function (r) {
-          return '<div class="vrow c-' + (r.c || 'g') + '"><span class="vl">' + esc(r.label) + '</span><span class="vk">' + esc(r.key) + '</span><span class="vx">' + esc(r.ex || '') + (r.it ? '<br><i>' + esc(r.it) + '</i>' : '') + '</span></div>';
+          return '<div class="vrow c-' + (r.c || 'g') + '"><span class="vl">' + eh(r.label) + '</span><span class="vk">' + eh(r.key) + '</span><span class="vx">' + eh(r.ex || '') + (r.it ? '<br><i>' + eh(r.it) + '</i>' : '') + '</span></div>';
         }).join('');
       } else if (b.type === 'flow') {
         body = b.rows.map(function (r) {
-          return '<div class="vflow c-' + (r.c || 'b') + '"><div class="vq">' + esc(r.q) + '</div><div class="va">→ ' + esc(r.a) + '</div>' + (r.ex ? '<div class="vex">' + esc(r.ex) + '</div>' : '') + (r.it ? '<div class="vit">' + esc(r.it) + '</div>' : '') + '</div>';
+          return '<div class="vflow c-' + (r.c || 'b') + '"><div class="vq">' + eh(r.q) + '</div><div class="va">→ ' + eh(r.a) + '</div>' + (r.ex ? '<div class="vex">' + eh(r.ex) + '</div>' : '') + (r.it ? '<div class="vit">' + eh(r.it) + '</div>' : '') + '</div>';
         }).join('');
       } else if (b.type === 'mod') {
         body = b.rows.map(function (r) {
-          return '<div class="vmod c-' + (r.c || 'b') + '"><div class="vmh"><span class="vmn" data-n="' + esc(r.n) + '"></span><b class="vmk">' + esc(r.k) + '</b></div><div class="vmf">' + esc(r.f) + '</div><div class="vme">' + esc(r.e) + '</div>' +
-            r.ex.map(function (x) { return '<div class="vmx">' + esc(x[0]) + '<i>' + esc(x[1]) + '</i></div>'; }).join('') + '</div>';
+          return '<div class="vmod c-' + (r.c || 'b') + '"><div class="vmh"><span class="vmn" data-n="' + eh(r.n) + '"></span><b class="vmk">' + eh(r.k) + '</b></div><div class="vmf">' + eh(r.f) + '</div><div class="vme">' + eh(r.e) + '</div>' +
+            r.ex.map(function (x) { return '<div class="vmx">' + eh(x[0]) + '<i>' + eh(x[1]) + '</i></div>'; }).join('') + '</div>';
         }).join('');
+      } else if (b.type === 'svg') {
+        body = b.svg || '';
       } else if (b.type === 'grid') {
         body = '<div class="vgrid" style="grid-template-columns:minmax(0,.8fr) repeat(' + b.cols.length + ',1fr)"><div></div>' +
-          b.cols.map(function (c, ci) { return '<div class="vcell vhead g' + ci + '"><b>' + esc(c.t) + '</b><small>' + esc(c.s || '') + '</small></div>'; }).join('') +
+          b.cols.map(function (c, ci) { return '<div class="vcell vhead g' + ci + '"><b>' + eh(c.t) + '</b><small>' + eh(c.s || '') + '</small></div>'; }).join('') +
           b.rows.map(function (r) {
-            return '<div class="vlab">' + esc(r.label) + '</div>' + r.cells.map(function (c, ci) { return '<div class="vcell g' + ci + '"><b>' + esc(c.t) + '</b><small>' + esc(c.s || '') + '</small></div>'; }).join('');
+            return '<div class="vlab">' + eh(r.label) + '</div>' + r.cells.map(function (c, ci) { return '<div class="vcell g' + ci + '"><b>' + eh(c.t) + '</b><small>' + eh(c.s || '') + '</small></div>'; }).join('');
           }).join('') + '</div>';
       }
-      return '<div class="vblock">' + h + body + (b.note ? '<div class="vnote">' + esc(b.note) + '</div>' : '') + '</div>';
+      return '<div class="vblock">' + h + body + (b.note ? '<div class="vnote">' + eh(b.note) + '</div>' : '') + '</div>';
     }).join('');
   }
-  function blocksText(blocks) { return JSON.stringify(blocks).replace(/[{}\[\]":,]|\b(type|rows|cols|cells|label|key|ex|sub|note|h|t|s|c)\b/g, ' ').toLowerCase(); }
+  function blocksText(blocks) { return JSON.stringify(blocks.map(function (b) { return Object.assign({}, b, { svg: undefined }); })).replace(/[{}\[\]":,]|\b(type|rows|cols|cells|label|key|ex|sub|note|h|t|s|c)\b/g, ' ').toLowerCase(); }
   function hkey(s, ri) { return s.title + '||' + ri; }
   function hiParse(k) {
     var j = k.lastIndexOf('||'); if (j < 0) return null;
@@ -493,6 +551,25 @@
     if (/^(Tempi|Mappa dei tempi|Present Perfect|Passivo|Essere|Avere —|Have got|Soon to be)/.test(title)) return 'Tempi';
     return 'Grammatica';
   }
+  var TC = ['b', 'g', 'o', 'p', 't', 'y'];
+  function colCls(cols) {
+    return cols.map(function (c, i) {
+      var h = String(c).toLowerCase();
+      if (/sbagliat|tentativ|errore|non dire|^no\b/.test(h)) return 'r';
+      if (/corrett|giust|si dice|^ok\b/.test(h)) return 'g';
+      if (/perch|regola|nota|spiegaz|uso|quando/.test(h)) return 'o';
+      if (/tradu|italiano/.test(h)) return 'b';
+      if (/frasi|esempi|inglese/.test(h)) return 'g';
+      return TC[i % TC.length];
+    });
+  }
+  function schCls(title) { return 'cat-' + schemaCat(title).toLowerCase().replace(/[^a-z]/g, ''); }
+  function schemaIdx(prefix) { var p = prefix.toLowerCase(), r = -1; (D.schemi || []).forEach(function (s, i) { if (r < 0 && s.title.toLowerCase().indexOf(p) === 0) r = i; }); return r; }
+  function openSchemaByTitle(prefix) {
+    var i = schemaIdx(prefix); if (i < 0) { toast('Schema non trovato'); return; }
+    openSchemi.add(i); schCat = 'Tutti'; save('schCat', schCat); go('schemi');
+    setTimeout(function () { var c = document.querySelector('.schemecard[data-schema="' + i + '"]'); if (c) c.scrollIntoView({ block: 'start' }); }, 60);
+  }
   function azKey(s) { return s.replace(/^[^A-Za-z0-9À-ÿ]+/, ''); }
   function schemiBody(term, raw) {
     var t = (term || '').toLowerCase().trim();
@@ -505,32 +582,38 @@
     var cardOf = function (s, i) {
       if (!raw && !t && schCat !== 'Tutti' && schemaCat(s.title) !== schCat) return '';
       if (s.blocks) {
-        if (t && s.title.toLowerCase().indexOf(t) < 0 && blocksText(s.blocks).indexOf(t) < 0) return '';
+        if (t && !sm(s.title, t) && !sm(blocksText(s.blocks), t)) return '';
         var op = t ? true : openSchemi.has(i);
-        return '<div class="schemecard' + (op ? ' open' : '') + '" data-schema="' + i + '">' +
+        return '<div class="schemecard ' + schCls(s.title) + (op ? ' open' : '') + '" data-schema="' + i + '">' +
           '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
-          '<div class="sbody"><div class="vwrap">' + blocksHtml(s.blocks) + '</div>' + (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + noteBlock('s:' + s.title) + '</div></div>';
+          '<div class="sbody"><div class="vwrap">' + blocksHtml(s.blocks) + '</div>' + (s.note ? '<div class="schemenote">' + eh(s.note) + '</div>' : '') + noteBlock('s:' + s.title) + '</div></div>';
       }
-      var titleHit = t && s.title.toLowerCase().indexOf(t) >= 0;
-      var head = '<tr>' + s.cols.map(function (c) { return '<th>' + esc(c) + '</th>'; }).join('') + '<th class="scrth"></th></tr>';
+      var titleHit = t && sm(s.title, t);
+      var hideT = /tentativo/i.test(s.cols[0] || '');
+      var dcols = hideT ? s.cols.slice(1) : s.cols;
+      var cc = colCls(dcols);
+      var head = '<tr>' + dcols.map(function (c, ci) { return '<th class="tc-' + cc[ci] + '">' + esc(c) + '</th>'; }).join('') + '<th class="scrth"></th></tr>';
       var shown = 0;
       var rows = s.rows.map(function (r, ri) {
-        if (t && !titleHit && r.join(' ').toLowerCase().indexOf(t) < 0) return '';
+        if (String(r[0]).charAt(0) === '§') { return (t && !titleHit) ? '' : '<tr class="sechead"><td colspan="' + (dcols.length + 1) + '">' + esc(String(r[0]).slice(1).trim()) + '</td></tr>'; }
+        if (t && !titleHit && !sm(r.join(' '), t)) return '';
         shown++;
         var key = hkey(s, ri), hi = schemaHi.has(key);
-        return '<tr class="' + (hi ? 'hi' : '') + '" data-act="schemarow" data-arg="' + esc(key).replace(/"/g, '&quot;') + '">' + r.map(function (c) {
+        var attempt = hideT ? String(r[0]) : '', rr = hideT ? r.slice(1) : r;
+        return '<tr class="' + (hi ? 'hi' : '') + '" data-act="schemarow" data-arg="' + esc(key).replace(/"/g, '&quot;') + '">' + rr.map(function (c, ci) {
           var parts = String(c).split('\n');
-          var ex = parts.length > 1 ? '<div class="cex">' + esc(parts.slice(1).join(' ')) + '</div>' : '';
-          return '<td>' + esc(parts[0]) + ex + '</td>';
-        }).join('') + '<td class="scrtd"><button class="scradd" data-act="scradd" data-arg="' + esc(key).replace(/"/g, '&quot;') + '" aria-label="Aggiungi a un discorso">＋</button></td></tr>';
+          var ex = parts.length > 1 ? '<div class="cex">' + eh(parts.slice(1).join(' ')) + '</div>' : '';
+          var tn = (hideT && ci === 0) ? '<div class="tent"><b>✗ Il mio tentativo:</b> ' + esc(attempt) + '</div>' : '';
+          return '<td class="tc-' + cc[ci] + '">' + tn + eh(parts[0]) + ex + '</td>';
+        }).join('') + '<td class="scrtd">' + (hideT ? '<button class="tentbtn" data-act="tent" aria-label="Mostra il mio tentativo">✗</button>' : '') + '<button class="scradd" data-act="scradd" data-arg="' + esc(key).replace(/"/g, '&quot;') + '" aria-label="Aggiungi a un discorso">＋</button></td></tr>';
       }).join('');
-      if (t && !shown && !(s.note && s.note.toLowerCase().indexOf(t) >= 0)) return '';
+      if (t && !shown && !(s.note && sm(s.note, t))) return '';
       var open = t ? true : openSchemi.has(i); // durante la ricerca le card trovate si aprono da sole
-      return '<div class="schemecard' + (open ? ' open' : '') + '" data-schema="' + i + '">' +
+      return '<div class="schemecard ' + schCls(s.title) + (open ? ' open' : '') + '" data-schema="' + i + '">' +
         '<div class="shead" data-act="schema" data-arg="' + i + '"><span class="schemetitle">' + esc(s.title) + '</span><span class="chev">›</span></div>' +
         '<div class="sbody"><div class="tablewrap"><table class="scheme"><thead>' + head + '</thead><tbody>' + rows + '</tbody></table></div>' +
         '<button class="lmini scrbulk" data-act="scrbulk" data-arg="' + i + '">＋ Aggiungi le righe evidenziate di questa card a un discorso</button>' +
-        (s.note ? '<div class="schemenote">' + esc(s.note) + '</div>' : '') + noteBlock('s:' + s.title) +
+        (s.note ? '<div class="schemenote">' + eh(s.note) + '</div>' : '') + noteBlock('s:' + s.title) +
         '</div></div>';
     };
     var ord = (D.schemi || []).map(function (s, i) { return i; }), lastL = '';
@@ -578,7 +661,7 @@
   var flashDeck = load('flashDeck', 'all'); // 'all' | 'voc' | 'phr' | 'pv'
   function flashPool() {
     var a = [];
-    D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: vsplit(d.extra).pr, ty: 'voc' }); });
+    D.vocab.forEach(function (d, i) { a.push({ id: 'v' + i, en: d.en, it: d.it, pr: vsplit(d.extra).pr.replace(/^⚠\s*/, ''), ty: 'voc' }); });
     D.idiomi.forEach(function (d, i) { a.push({ id: 'i' + i, en: d.en, it: d.it, pr: '', ty: 'phr' }); });
     D.canzoni.forEach(function (s, si) { s.items.forEach(function (d, ii) { a.push({ id: 's' + si + '_' + ii, en: d.en, it: d.it, pr: '', ty: 'phr' }); }); });
     if (D.phrasal) D.phrasal.forEach(function (d, i) { a.push({ id: 'p' + i, en: d.pv, it: d.it + ' (= ' + d.eq + ', ' + d.sep + ')', pr: '', ty: 'pv' }); });
@@ -708,14 +791,41 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v108</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v111</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
+  var wgroup = '';
+  function linkTitle(l) {
+    if (l[0] === 's') { var i = schemaIdx(l[1]); return i < 0 ? null : { t: D.schemi[i].title, a: 'schema:' + l[1] }; }
+    var r = D.rules.filter(function (x) { return x.n === l[1]; })[0]; return r ? { t: 'Regola ' + r.n + ' — ' + r.title, a: 'rule:' + r.n } : null;
+  }
+  function writeBox() {
+    var H = D.home || {}, ps = (D.schemi || []).filter(function (s) { return s.title.indexOf('Pensare semplice') === 0; })[0];
+    var steps = ps ? ps.rows.filter(function (r) { return /^[0-5]\./.test(r[0]); }).map(function (r) {
+      var m = r[0].match(/^(\d)\.\s*(.*)$/); return '<div class="wstep"><span class="wn">' + m[1] + '</span>' + esc(m[2]) + '</div>';
+    }).join('') : '';
+    var chk = (H.checklist || []).map(function (c, i) {
+      return '<div class="wc"><div class="wq"><span class="wn g">' + (i + 1) + '</span>' + esc(c.q) + '</div><div class="wex"><span class="bad">✗ ' + esc(c.wrong) + '</span><span class="good">✓ ' + esc(c.right) + '</span></div></div>';
+    }).join('');
+    var chips = (H.groups || []).map(function (g) { return '<button class="chip2' + (wgroup === g.id ? ' on' : '') + '" data-act="wchip" data-arg="' + g.id + '">' + g.ic + ' ' + esc(g.q) + '</button>'; }).join('');
+    var panel = '';
+    (H.groups || []).forEach(function (g) {
+      if (g.id !== wgroup) return;
+      panel = '<div class="wpanel">' + g.links.map(linkTitle).filter(Boolean).map(function (x) {
+        return '<div class="wlk" data-act="go2" data-arg="' + esc(x.a).replace(/"/g, '&quot;') + '"><span>' + esc(x.t) + '</span><span class="chev">›</span></div>';
+      }).join('') + '</div>';
+    });
+    return '<div class="hgroup">Per scrivere bene</div><div class="wbox" id="wbox">' +
+      '<div class="whead" data-act="go2" data-arg="schema:Pensare semplice"><b>🧠 Pensare semplice</b><span>apri la card ›</span></div>' + steps +
+      '<div class="wchk"><div class="wchead">✅ Prima di inviare, controlla</div>' + chk + '</div>' +
+      '<div class="wchead" style="margin-top:14px">🧭 Cosa vuoi dire?</div><div class="chips wchips">' + chips + '</div>' + panel + '</div>' +
+      '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti<span class="cdesc">gli errori che ripeto, divisi per argomento</span></span><span class="chev">›</span></div></div>';
+  }
   function homeBody(term) {
     if (term && term.trim()) return searchAll(term.trim().toLowerCase());
-    var out = '<button class="bigbtn" data-act="go" data-arg="flashcard">▶︎  Riprendi studio</button>' +
-      '<button class="bigbtn alt" data-act="go" data-arg="componi">✎  Frase del giorno</button>';
+    var out = '<div class="homebtns"><button class="hbtn" data-act="go" data-arg="flashcard">▶︎ Riprendi studio</button>' +
+      '<button class="hbtn alt" data-act="go" data-arg="componi">✎ Frase del giorno</button></div>' + writeBox();
     if (recent.length) {
       out += '<div class="hgroup">Ultime aperte</div>';
       out += recent.map(function (r) { return '<div class="card" data-act="go2" data-arg="' + r.id + '"><div class="head"><span class="ctitle">' + esc(r.label) + '</span><span class="chev">›</span></div></div>'; }).join('');
@@ -723,6 +833,7 @@
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
       tile('discorsi', '🗣', 'I miei discorsi', scripts.length + ' discorsi') +
+      tile('diario', '📔', 'Diario', (D.diario || []).length + ' conversazioni') +
       tile('note', '📝', 'Le mie note', Object.keys(notes).filter(function (k) { return notes[k]; }).length + ' note') +
       '<div class="tile" data-act="hi"><div class="ti">⭐</div><div class="tl">Evidenziate</div><div class="ts">' + hiCount() + ' frasi</div></div>' +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
@@ -746,28 +857,95 @@
   function tile(id, ic, label, sub) {
     return '<div class="tile" data-act="go" data-arg="' + id + '"><div class="ti">' + ic + '</div><div class="tl">' + label + '</div><div class="ts">' + sub + '</div></div>';
   }
+  /* ---------- scheda del verbo (paradigmi, costruzioni, phrasal con separabilità, regole) ---------- */
+  var VTAG = { to: ['+ to', 'b'], ing: ['+ -ing', 'g'], base: ['+ base', 'p'], irr: ['irregolare', 'o'] };
+  function verbLookup(t) {
+    t = (t || '').trim().toLowerCase().replace(/^to /, ''); if (t.length < 2) return null;
+    var vb = (D.verbi || []).filter(function (v) { return v.v === t; })[0];
+    var has = function (s, w) { return String(s).toLowerCase().split(/\s*\/\s*/).indexOf(w) >= 0; };
+    var irr = (D.irregolari || []).filter(function (x) { return x.en.toLowerCase() === t || has(x.past, t) || has(x.pp, t); })[0];
+    if (!vb && irr) vb = (D.verbi || []).filter(function (v) { return v.v === irr.en.toLowerCase(); })[0];
+    var base = vb ? vb.v : (irr ? irr.en.toLowerCase() : t);
+    var ph = (D.phrasal || []).filter(function (p) { var q = p.pv.toLowerCase(); return q === 'to ' + base || q.indexOf('to ' + base + ' ') === 0; });
+    if (!vb && !irr && !ph.length) return null;
+    return { base: base, vb: vb, irr: irr, ph: ph };
+  }
+  function verbTags(vb, irr) {
+    var tg = (vb && vb.tags || []).slice(); if (irr) tg.push('irr');
+    return tg.map(function (k) { return '<span class="vt vt-' + VTAG[k][1] + '">' + VTAG[k][0] + '</span>'; }).join('');
+  }
+  function verbCard(t) {
+    var L = verbLookup(t); if (!L) return '';
+    var vb = L.vb, irr = L.irr, out = '<div class="vcard"><div class="vch"><b>' + esc(L.base.toUpperCase()) + '</b><span>' + esc(vb ? vb.it : (irr ? irr.it : '')) + '</span></div>' + (verbTags(vb, irr) ? '<div class="vtags">' + verbTags(vb, irr) + '</div>' : '');
+    if (irr) out += '<div class="vcp"><b>' + esc(irr.en) + ' – ' + esc(irr.past) + ' – ' + esc(irr.pp) + '</b><small> (irregolare)</small></div>';
+    if (vb) out += vb.pat.map(function (x) { return '<div class="vcpat"><div class="vcf">' + eh(x[0]) + '</div><div class="vci">' + eh(x[1]) + '</div><div class="vce">' + eh(x[2]) + '</div></div>'; }).join('');
+    if (L.ph.length) out += '<div class="vcsub">Phrasal verbs</div>' + L.ph.map(function (p) {
+      var ns = /non/i.test(p.sep || '');
+      return '<div class="vcph"><b>' + esc(p.pv) + '</b> ' + esc(p.it) + ' <span class="sepb ' + (ns ? 'n' : 's') + '">' + esc(p.sep || '') + '</span><div class="vce">' + esc(p.ex) + '</div></div>';
+    }).join('');
+    if (vb && vb.rules && vb.rules.length) out += '<div class="vcsub">Regole</div>' + vb.rules.map(function (n) {
+      var r = D.rules.filter(function (x) { return x.n === n; })[0]; return r ? '<div class="wlk" data-act="go2" data-arg="rule:' + n + '"><span>Regola ' + r.n + ' — ' + esc(r.title) + '</span><span class="chev">›</span></div>' : '';
+    }).join('');
+    return out + '</div>';
+  }
+  function vocChips(v) {
+    if (!/^to /i.test(v.en)) return '';
+    var w = v.en.toLowerCase().replace(/\(.*?\)/g, '').replace(/^to /, '').trim().split(' ')[0];
+    var vb = (D.verbi || []).filter(function (x) { return x.v === w; })[0];
+    var irr = (D.irregolari || []).filter(function (x) { return x.en.toLowerCase() === w; })[0];
+    return (vb || irr) ? '<div class="vtags sm">' + verbTags(vb, irr) + '</div>' : '';
+  }
+  /* ---------- DIARIO DELLE CONVERSAZIONI ---------- */
+  var diaOpen = new Set();
+  function diaDate(d) { if (!d) return ''; var m = d.split('-'), mn = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre']; return (+m[2]) + ' ' + mn[+m[1] - 1] + ' ' + m[0]; }
+  function diarioCard(e, open) {
+    var body = '';
+    if (e.theirs) body += '<div class="dbox dth"><b>💬 ' + esc(e.who || 'Messaggio') + '</b>' + esc(e.theirs) + (e.theirs_it ? '<i>' + esc(e.theirs_it) + '</i>' : '') + '</div>';
+    if (e.mine) body += '<div class="dbox dmi"><b>✗ Cosa ho scritto</b>' + esc(e.mine) + '</div>';
+    if (e.fixed) body += '<div class="dbox dfx"><b>✓ ' + (e.mine ? 'Corretta' : 'La mia risposta') + '</b>' + esc(e.fixed) + '</div>';
+    if (e.notes && e.notes.length) body += '<div class="dnotes"><b>Cosa è cambiato</b>' + e.notes.map(function (n) { return '<div class="dn">' + esc(n) + '</div>'; }).join('') + '</div>';
+    if (e.good) body += '<div class="dbox dgd"><b>⭐ Punti forti</b>' + esc(e.good) + '</div>';
+    return '<div class="card ' + (open ? 'open' : '') + '"><div class="head" data-act="dopen" data-arg="' + esc(e.id) + '"><span class="ctitle">' + esc((e.who ? e.who + ' — ' : '') + e.topic) +
+      '<span class="cdesc">' + (e.date ? esc(diaDate(e.date)) + ' · ' : '') + (e.mine ? 'come ho scritto → versione corretta' : 'la mia risposta') + '</span></span><span class="chev">›</span></div>' +
+      '<div class="body"><div class="body-in">' + body + noteBlock('d:' + e.id) + '</div></div></div>';
+  }
+  function diarioBody(term) {
+    var t = (term || '').toLowerCase();
+    var list = (D.diario || []).filter(function (e) { return !t || sm(JSON.stringify(e), t); }).slice().sort(function (a, b) { return b.part - a.part || (b.date || '').localeCompare(a.date || ''); });
+    var out = t ? '' : '<div class="lnote">Qui tengo la cronologia delle conversazioni: con chi, cosa ho scritto, la versione corretta e cosa è cambiato. Si aggiunge una voce a ogni nuova parte; per studiare usa Regole, Schemi e Vocabolario.</div>';
+    if (!list.length) return out + '<div class="empty">Nessuna voce trovata.</div>';
+    var last = null;
+    list.forEach(function (e) {
+      if (e.part !== last) { out += '<div class="hgroup">Parte ' + e.part + (e.date ? ' · ' + esc(diaDate(e.date)) : '') + '</div>'; last = e.part; }
+      out += diarioCard(e, diaOpen.has(e.id) || !!t);
+    });
+    return out;
+  }
   function searchAll(t) {
-    var out = '';
-    var rr = D.rules.filter(function (r) { return (r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')).toLowerCase().indexOf(t) >= 0; });
+    var out = (t.indexOf(' ') < 0 ? verbCard(t) : '');
+    var dd = (D.diario || []).filter(function (e) { return sm(JSON.stringify(e), t); });
+    var diaOut = dd.length ? '<div class="hgroup">Diario (' + dd.length + ')</div>' + dd.map(function (e) { return diarioCard(e, true); }).join('') : '';
+    var rr = D.rules.filter(function (r) { return sm((r.title + ' ' + r.items.filter(function (i) { return i.t !== 'audio' && i.t !== 'audioit'; }).map(function (i) { return i.s; }).join(' ')), t); });
     if (rr.length) out += '<div class="hgroup">Regole (' + rr.length + ')</div>' + rr.map(function (r) { return ruleCard(r, openRules.has(r.n)); }).join('');
-    var vv = D.vocab.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.en + ' ' + x.d.it).toLowerCase().indexOf(t) >= 0; });
+    var vv = D.vocab.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return sm((x.d.en + ' ' + x.d.it), t); });
     if (vv.length) out += '<div class="hgroup">Vocaboli (' + vv.length + ')</div>' + vv.map(function (x) { return vocRow(x.d, x.i); }).join('');
-    var ii = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.en + ' ' + x.d.it).toLowerCase().indexOf(t) >= 0; });
+    var ii = D.idiomi.map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return sm((x.d.en + ' ' + x.d.it), t); });
     if (ii.length) out += '<div class="hgroup">Modi di dire (' + ii.length + ')</div>' + ii.map(function (x) { return idiRow(x.d, x.i); }).join('');
-    var pp = (D.phrasal || []).map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.pv + ' ' + x.d.it + ' ' + x.d.eq).toLowerCase().indexOf(t) >= 0; });
+    var pp = (D.phrasal || []).map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return sm((x.d.pv + ' ' + x.d.it + ' ' + x.d.eq), t); });
     if (pp.length) out += '<div class="hgroup">Phrasal verbs (' + pp.length + ')</div>' + pp.map(function (x) { return phrRow(x.d, x.i); }).join('');
-    var ww = (D.irregolari || []).map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return (x.d.en + ' ' + x.d.it + ' ' + x.d.past + ' ' + x.d.pp).toLowerCase().indexOf(t) >= 0; });
+    var ww = (D.irregolari || []).map(function (d, i) { return { d: d, i: i }; }).filter(function (x) { return sm((x.d.en + ' ' + x.d.it + ' ' + x.d.past + ' ' + x.d.pp), t); });
     if (ww.length) out += '<div class="hgroup">Verbi irregolari (' + ww.length + ')</div>' + ww.map(function (x) { return verbRow(x.d, x.i); }).join('');
-    var cc = D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' ').toLowerCase().indexOf(t) >= 0; });
+    var cc = D.racconti.map(function (s, i) { return { s: s, i: i }; }).filter(function (x) { return sm(x.s.blocks.filter(function (b) { return b.s; }).map(function (b) { return b.s; }).join(' '), t); });
     if (cc.length) out += '<div class="hgroup">Racconti (' + cc.length + ')</div>' + cc.map(function (x) { var m = x.s.title.match(/^(.*?)\s*\(/); return '<div class="card" data-act="go2" data-arg="racc:' + x.i + '"><div class="head"><span class="ctitle">' + esc(m ? m[1].trim() : x.s.title) + '</span><span class="chev">›</span></div></div>'; }).join('');
     var sb = schemiBody(t, true);
     if (sb.indexOf('class="empty"') < 0) out += '<div class="hgroup">Schemi (' + (sb.match(/class="schemecard/g) || []).length + ')</div>' + sb;
-    var nn = Object.keys(notes).filter(function (k) { return notes[k] && (notes[k] + ' ' + noteLabel(k)).toLowerCase().indexOf(t) >= 0; });
+    var nn = Object.keys(notes).filter(function (k) { return notes[k] && sm((notes[k] + ' ' + noteLabel(k)), t); });
     if (nn.length) out += '<div class="hgroup">Le mie note (' + nn.length + ')</div>' + nn.map(function (k) { return '<div class="hgroup" style="font-size:12px">' + esc(noteLabel(k)) + '</div>' + noteBlock(k); }).join('');
-    var tm = (D.tempi || []).filter(function (x) { return JSON.stringify(x).toLowerCase().indexOf(t) >= 0; });
+    var tm = (D.tempi || []).filter(function (x) { return sm(JSON.stringify(x), t); });
     if (tm.length) out += '<div class="hgroup">Tempi verbali (' + tm.length + ')</div><div class="card" data-act="go" data-arg="tempi"><div class="head"><span class="ctitle">' + esc(tm.map(function (x) { return x.tense; }).join(' · ')) + '<span class="cdesc">Apri la sezione Tempi verbali</span></span><span class="chev">›</span></div></div>';
-    var cz = (D.canzoni || []).filter(function (x) { return JSON.stringify(x).toLowerCase().indexOf(t) >= 0; });
+    var cz = (D.canzoni || []).filter(function (x) { return sm(JSON.stringify(x), t); });
     if (cz.length) out += '<div class="hgroup">Canzoni (' + cz.length + ')</div><div class="card" data-act="go" data-arg="canzoni"><div class="head"><span class="ctitle">' + esc(cz.map(function (x) { return x.song; }).join(' · ')) + '<span class="cdesc">Apri la sezione Canzoni</span></span><span class="chev">›</span></div></div>';
+    out += diaOut;
     return out || '<div class="empty">Nessun risultato per “' + esc(t) + '”.</div>';
   }
 
@@ -797,6 +975,7 @@
     if (act === 'go') go(arg);
     else if (act === 'go2') {
       if (arg.indexOf('racc:') === 0) { var i = +arg.slice(5); var t = (D.racconti[i].title.match(/^(.*?)\s*\(/) || [, D.racconti[i].title])[1].trim(); pushRecent({ id: arg, label: 'Racconto: ' + t }); go('racc', i); }
+      else if (arg.indexOf('schema:') === 0) { openSchemaByTitle(arg.slice(7)); }
       else if (arg.indexOf('rule:') === 0) { var rn = +arg.slice(5); openRules.add(rn); go('regole'); setTimeout(function () { var rc = document.querySelector('.card[data-rule="' + rn + '"]'); if (rc) rc.scrollIntoView({ block: 'center' }); }, 50); }
     }
     else if (act === 'rule') {
@@ -884,6 +1063,13 @@
       try { var na = document.createElement('a'); na.href = URL.createObjectURL(new Blob([JSON.stringify(exp, null, 1)], { type: 'application/json' })); na.download = 'note.json'; document.body.appendChild(na); na.click(); na.remove(); } catch (er) {}
     }
     else if (act === 'hi') { schCat = 'Evidenziate'; save('schCat', schCat); go('schemi'); }
+    else if (act === 'dopen') { var cdd = el.closest('.card'); if (diaOpen.has(arg)) { diaOpen.delete(arg); if (cdd) cdd.classList.remove('open'); } else { diaOpen.add(arg); if (cdd) cdd.classList.add('open'); } }
+    else if (act === 'srchwide') { searchInside = true; var qw = document.getElementById('q'), bw = document.getElementById('body'); if (qw && bw) runSearch(qw.value, bw); }
+    else if (act === 'vochard') { vocHard = !vocHard; var qv = document.getElementById('q'); var bv = document.getElementById('body'); if (bv) bv.innerHTML = vocabBody(qv ? qv.value : ''); }
+    else if (act === 'wchip') { wgroup = (wgroup === arg) ? '' : arg; var hb = document.getElementById('body'); if (hb) hb.innerHTML = homeBody(''); }
+    else if (act === 'wlink') { wgroup = arg; go('home'); setTimeout(function () { var wb = document.getElementById('wbox'); if (wb) wb.scrollIntoView({ block: 'start' }); }, 60); }
+    else if (act === 'tent') { var trw = el.closest('tr'); if (trw) trw.classList.toggle('tentopen'); }
+    else if (act === 'ruleord') { ruleOrd = ruleOrd === 'az' ? 'cat' : 'az'; save('ruleOrd', ruleOrd); var qr = document.getElementById('q'); var br = document.getElementById('body'); if (br) br.innerHTML = regoleBody(qr ? qr.value : ''); window.scrollTo(0, 0); }
     else if (act === 'schord') { schOrd = schOrd === 'az' ? 'orig' : 'az'; save('schOrd', schOrd); var qo = document.getElementById('q'); var bo = document.getElementById('body'); if (bo) bo.innerHTML = schemiBody(qo ? qo.value : ''); window.scrollTo(0, 0); }
     else if (act === 'schcat') { schCat = arg; save('schCat', schCat); var qs = document.getElementById('q'); var bs = document.getElementById('body'); if (bs) bs.innerHTML = schemiBody(qs ? qs.value : ''); window.scrollTo(0, 0); }
     else if (act === 'regcat') { regCat = arg; var qc = document.getElementById('q'); var bc = document.getElementById('body'); if (bc) bc.innerHTML = regoleBody(qc ? qc.value : ''); window.scrollTo(0, 0); }
@@ -1021,6 +1207,11 @@
     if (e.target.id !== 'q') return;
     var b = document.getElementById('body'); if (!b) return;
     var term = e.target.value;
+    if (term !== lastTerm) { searchInside = false; lastTerm = term; }
+    runSearch(term, b);
+  });
+  function runSearch(term, b) {
+    smMiss = 0;
     if (route.name === 'home') b.innerHTML = homeBody(term);
     else if (route.name === 'regole') b.innerHTML = regoleBody(term);
     else if (route.name === 'vocab') b.innerHTML = vocabBody(term);
@@ -1029,25 +1220,34 @@
     else if (route.name === 'irregolari') b.innerHTML = irregolariBody(term);
     else if (route.name === 'schemi') b.innerHTML = schemiBody(term);
     else if (route.name === 'canzoni') b.innerHTML = canzoniBody(term);
+    else if (route.name === 'diario') b.innerHTML = diarioBody(term);
     highlight(b, term);
     if (term.trim() && b.querySelector('.empty')) {
       var q = 'Come si dice in inglese (o cosa significa): ' + term.trim() + '? Rispondi in modo breve, con un esempio.';
       b.insertAdjacentHTML('beforeend', '<a class="askclaude" href="https://claude.ai/new?q=' + encodeURIComponent(q) + '" target="_blank" rel="noopener">✨ Chiedi a Claude: “' + esc(term.trim()) + '”</a>');
     }
-  });
+    if (term.trim() && !searchInside && smMiss > 0) b.insertAdjacentHTML('beforeend', '<button class="lmini widebtn" data-act="srchwide">🔎 Mostra anche i risultati dentro altre parole</button>');
+  }
   /* evidenzia il termine cercato nei risultati */
   function highlight(root, term) {
     term = (term || '').trim().toLowerCase();
     if (term.length < 2) return;
     var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null, false), nodes = [], n;
     while ((n = walker.nextNode())) { if (n.nodeValue.toLowerCase().indexOf(term) >= 0) nodes.push(n); }
+    var short = term.length <= 3, L = 'a-zà-ÿ0-9', er = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    var hre = searchInside ? new RegExp(er, 'gi') : new RegExp('(^|[^' + L + '])(' + er + ')' + (short ? '(?![' + L + '])' : ''), 'gi');
     nodes.forEach(function (node) {
-      var txt = node.nodeValue, low = txt.toLowerCase(), i = 0, p, frag = document.createDocumentFragment();
-      while ((p = low.indexOf(term, i)) >= 0) {
+      var txt = node.nodeValue, i = 0, mm, frag = document.createDocumentFragment(), any = false;
+      hre.lastIndex = 0;
+      while ((mm = hre.exec(txt)) !== null) {
+        var p = searchInside ? mm.index : mm.index + mm[1].length, len = term.length;
+        if (!len) break;
+        any = true;
         if (p > i) frag.appendChild(document.createTextNode(txt.slice(i, p)));
-        var m = document.createElement('mark'); m.textContent = txt.slice(p, p + term.length); frag.appendChild(m);
-        i = p + term.length;
+        var m = document.createElement('mark'); m.textContent = txt.slice(p, p + len); frag.appendChild(m);
+        i = p + len; hre.lastIndex = i;
       }
+      if (!any) return;
       if (i < txt.length) frag.appendChild(document.createTextNode(txt.slice(i)));
       node.parentNode.replaceChild(frag, node);
     });
@@ -1153,6 +1353,7 @@
         var skipFirst = /^sbagliato|^il mio tentativo/i.test(s.cols[0] || '');
         s.rows.forEach(function (r, ri) {
           curKey = 'schemi:' + i + ':' + ri;
+          if (String(r[0]).charAt(0) === '§') { pushL(a, 'it', String(r[0]).slice(1)); return; }
           r.forEach(function (c, ci) {
             if (skipFirst && ci === 0) return;
             var first = String(c).split('\n')[0];
