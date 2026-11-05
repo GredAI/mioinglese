@@ -5,7 +5,9 @@
   // migrazione dati dopo la riorganizzazione (v110): sposta evidenziazioni e note sulle card nuove, azzera le selezioni dell'Ascolto (cambiano gli indici)
   (function () {
     try {
-      if (localStorage.getItem('dataVer') === '110') return;
+      var dv = localStorage.getItem('dataVer');
+      if (dv === '114') return;
+      if (dv === '110') { var M2 = (D.home && D.home.migrate && D.home.migrate.hi2) || {}; var h2 = JSON.parse(localStorage.getItem('schemaHi') || '[]'), n2 = {}; h2.forEach(function (k) { n2[M2[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(n2))); localStorage.setItem('dataVer', '114'); return; }
       var M = (D.home && D.home.migrate) || { hi: {}, notes: {} };
       var hi = JSON.parse(localStorage.getItem('schemaHi') || '[]'); var nh = {};
       hi.forEach(function (k) { nh[M.hi[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(nh)));
@@ -13,7 +15,8 @@
       Object.keys(nt).forEach(function (k) { var to = M.notes[k] || k; out[to] = out[to] ? out[to] + '\n' + nt[k] : nt[k]; });
       localStorage.setItem('notes', JSON.stringify(out));
       localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl');
-      localStorage.setItem('dataVer', '110');
+      var M3 = M.hi2 || {}; var h3 = JSON.parse(localStorage.getItem('schemaHi') || '[]'), n3 = {}; h3.forEach(function (k) { n3[M3[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(n3)));
+      localStorage.setItem('dataVer', '114');
     } catch (e) {}
   })();
 
@@ -827,7 +830,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v113</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v114</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
