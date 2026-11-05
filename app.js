@@ -234,20 +234,24 @@
     out += '<label class="bigbtn alt implabel">⬆︎ Importa discorsi da un file<input type="file" accept=".json,application/json" id="scrimp" hidden></label><div class="lnote">Per portare i discorsi da un altro dispositivo: là premi «Esporta discorsi» (file discorsi.json), poi qui «Importa». I discorsi che hai già non vengono toccati: si aggiungono solo quelli nuovi o le frasi mancanti.</div>';
     return out + '</main>';
   }
-  var scrShowIt = load('scrShowIt', true);
+  var scrShowIt = load('scrShowIt', true), scrOnlyHi = load('scrOnlyHi', false);
+  function scrHiCount(d) { return d.items.filter(function (x) { return x.hi; }).length; }
   function scrScreen(id) {
     var i = scripts.map(function (d) { return d.id; }).indexOf(id), d = scripts[i];
     if (!d) return scrListScreen();
     var out = topBar(d.name, 'discorsi') + '<main class="fade" id="body">' +
       '<button class="bigbtn" data-act="scrplay" data-arg="' + i + ':0">▶︎ Ascolta il discorso intero</button>' +
       '<div class="lnav"><button class="lmini" data-act="scrplay" data-arg="' + i + ':1">Frase per frase, con traduzione</button><button class="lmini" data-act="scrcopy" data-arg="' + i + '">Copia testo</button></div>' +
-      '<div class="lnav"><button class="lmini" data-act="scrtr">' + (scrShowIt ? 'Nascondi traduzione' : 'Mostra traduzione') + '</button><button class="lmini" data-act="scrren" data-arg="' + i + '">Rinomina</button><button class="lmini" data-act="scrdel" data-arg="' + i + '">Elimina</button></div>';
+      '<div class="lnav"><button class="lmini" data-act="scrtr">' + (scrShowIt ? 'Nascondi traduzione' : 'Mostra traduzione') + '</button><button class="lmini" data-act="scrren" data-arg="' + i + '">Rinomina</button><button class="lmini" data-act="scrdel" data-arg="' + i + '">Elimina</button></div>' +
+      '<div class="lnav"><button class="lmini scrhibtn' + (scrOnlyHi ? ' on' : '') + '" data-act="scronlyhi" data-arg="' + i + '">⭐ ' + (scrOnlyHi ? 'Mostra tutto il discorso' : 'Solo evidenziate (' + scrHiCount(d) + ')') + '</button></div>' +
+      '<div class="lnote">Tocca ☆ accanto a una frase per evidenziarla; con «Solo evidenziate» vedi subito solo quelle, senza leggere tutto.</div>';
     var seenEn = {}, dups = 0; d.items.forEach(function (x) { var k = x.en.trim().toLowerCase(); if (seenEn[k]) dups++; else seenEn[k] = 1; });
     if (dups) out += '<div class="lnote">⚠️ Ci sono ' + dups + ' frasi ripetute in questo discorso.</div><button class="bigbtn alt" data-act="scrdedup" data-arg="' + i + '">Togli le frasi ripetute</button>';
     if (!d.items.length) out += '<div class="empty">Vuoto. Negli Schemi tocca ＋ accanto a una frase per aggiungerla qui.</div>';
     d.items.forEach(function (it, k) {
-      out += '<div class="scritem" id="si' + k + '"><div class="scrn">' + (k + 1) + '</div><div class="scrt"><div class="scren">' + esc(it.en) + '</div>' + (scrShowIt && it.it ? '<div class="scrit">' + esc(it.it) + '</div>' : '') + '</div>' +
-        '<div class="scrb"><button class="lmini" data-act="scrspk" data-arg="' + i + ':' + k + '">🔊</button><button class="lmini" data-act="scrup" data-arg="' + i + ':' + k + '">▲</button><button class="lmini" data-act="scrdn" data-arg="' + i + ':' + k + '">▼</button><button class="lmini" data-act="scred" data-arg="' + i + ':' + k + '">✏️</button><button class="lmini" data-act="scrrm" data-arg="' + i + ':' + k + '">🗑</button></div></div>';
+      if (scrOnlyHi && !it.hi) return;
+      out += '<div class="scritem' + (it.hi ? ' hi' : '') + '" id="si' + k + '"><div class="scrn">' + (k + 1) + '</div><div class="scrt"><div class="scren">' + esc(it.en) + '</div>' + (scrShowIt && it.it ? '<div class="scrit">' + esc(it.it) + '</div>' : '') + '</div>' +
+        '<div class="scrb"><button class="lmini scrstar' + (it.hi ? ' on' : '') + '" data-act="scrhi" data-arg="' + i + ':' + k + '" aria-label="Evidenzia">' + (it.hi ? '⭐' : '☆') + '</button><button class="lmini" data-act="scrspk" data-arg="' + i + ':' + k + '">🔊</button><button class="lmini" data-act="scrup" data-arg="' + i + ':' + k + '">▲</button><button class="lmini" data-act="scrdn" data-arg="' + i + ':' + k + '">▼</button><button class="lmini" data-act="scred" data-arg="' + i + ':' + k + '">✏️</button><button class="lmini" data-act="scrrm" data-arg="' + i + ':' + k + '">🗑</button></div></div>';
     });
     return out + '</main>';
   }
@@ -830,7 +834,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v114</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v115</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -1074,6 +1078,16 @@
       go('ascolto'); lpStart();
     }
     else if (act === 'scrspk') { var q1 = arg.split(':'); speak(scripts[+q1[0]].items[+q1[1]].en); }
+    else if (act === 'scrhi') {
+      var qh = arg.split(':'), ith = scripts[+qh[0]] && scripts[+qh[0]].items[+qh[1]];
+      if (ith) {
+        ith.hi = !ith.hi; if (!ith.hi) delete ith.hi; saveScripts();
+        var rowh = el.closest('.scritem'); if (rowh) { rowh.classList.toggle('hi', !!ith.hi); if (scrOnlyHi && !ith.hi) rowh.style.display = 'none'; }
+        el.textContent = ith.hi ? '⭐' : '☆'; el.classList.toggle('on', !!ith.hi);
+        var hb = document.querySelector('.scrhibtn'); if (hb && !scrOnlyHi) hb.textContent = '⭐ Solo evidenziate (' + scrHiCount(scripts[+qh[0]]) + ')';
+      }
+    }
+    else if (act === 'scronlyhi') { scrOnlyHi = !scrOnlyHi; save('scrOnlyHi', scrOnlyHi); render(); window.scrollTo(0, 0); }
     else if (act === 'scrup' || act === 'scrdn') {
       var q2 = arg.split(':'), a1 = scripts[+q2[0]].items, k1 = +q2[1], k2 = act === 'scrup' ? k1 - 1 : k1 + 1;
       if (k2 >= 0 && k2 < a1.length) { var tmp = a1[k1]; a1[k1] = a1[k2]; a1[k2] = tmp; saveScripts(); render(); }
