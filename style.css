@@ -363,3 +363,7 @@ tr.tentopen .tent{display:block}
 .wbox .whead{margin-bottom:0}.wbox.open .whead{margin-bottom:8px}
 .wbox .whead .chev{font-size:20px;color:#c4c4c9;transition:transform .2s}.wbox.open .whead .chev{transform:rotate(90deg)}
 .cdesc.snip{font-size:12.5px;line-height:1.35}
+
+.scritem.hi{background:#fff8dc;border-left:4px solid #f5b800}
+.scrstar.on{background:#fff0b3}
+.scrhibtn.on{background:#f5b800;color:#fff;border-color:#f5b800}
