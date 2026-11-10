@@ -367,3 +367,20 @@ tr.tentopen .tent{display:block}
 .scritem.hi{background:#fff8dc;border-left:4px solid #f5b800}
 .scrstar.on{background:#fff0b3}
 .scrhibtn.on{background:#f5b800;color:#fff;border-color:#f5b800}
+
+.pendbar{background:#fff4e0;border-left:5px solid #f59e0b;border-radius:12px;padding:10px 12px;margin:-4px 0 14px;font-size:14px;display:flex;gap:8px;align-items:center;cursor:pointer}
+.pendbar b{flex:none}.pendbar .chev{margin-left:auto}
+.pendbox{background:#fff4e0;border-radius:12px;padding:10px 12px;margin:8px 0 12px;border-left:5px solid #f59e0b}
+.pendh{font-weight:700;margin-bottom:6px}.pendnone{color:var(--muted);font-size:14px;margin-bottom:6px}
+.pend{display:flex;gap:8px;align-items:flex-start;padding:6px 0;cursor:pointer;font-size:15px}
+.pend .pk{font-size:20px;line-height:1}.pend.done .pt{text-decoration:line-through;color:var(--muted)}
+
+/* v116 · le parti sbagliate sempre in rosso */
+table.scheme td.tc-r{background:#fdeaea;color:#c0392b;font-weight:600}
+table.scheme td.tc-r::before{content:"✗ ";font-weight:800}
+table.scheme td.tc-r .cex{color:#c0392b;font-weight:400}
+.dmi{color:#c0392b}.dmi b{color:#c0392b}
+.exline.wrong{color:#c0392b;font-weight:600}.exline.wrong b{color:#c0392b}
+.vrow.c-r .vk,.vrow.c-r .vl{color:#c0392b}
+.bad{color:#c0392b;font-weight:700;background:rgba(192,57,43,.08);border-radius:3px;padding:0 2px}
+.exline.wrong .bad{color:#c0392b;background:none;padding:0}

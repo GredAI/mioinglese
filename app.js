@@ -6,8 +6,10 @@
   (function () {
     try {
       var dv = localStorage.getItem('dataVer');
-      if (dv === '114') return;
-      if (dv === '110') { var M2 = (D.home && D.home.migrate && D.home.migrate.hi2) || {}; var h2 = JSON.parse(localStorage.getItem('schemaHi') || '[]'), n2 = {}; h2.forEach(function (k) { n2[M2[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(n2))); localStorage.setItem('dataVer', '114'); return; }
+      if (dv === '117') return;
+      var MM = (D.home && D.home.migrate) || {};
+      function remapHi(map) { var h = JSON.parse(localStorage.getItem('schemaHi') || '[]'), n = {}; h.forEach(function (k) { n[map[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(n))); }
+      if (dv === '116' || dv === '114' || dv === '110') { remapHi((dv === '116' ? MM.hi4 : dv === '114' ? MM.hi3 : MM.hi2) || {}); localStorage.setItem('dataVer', '117'); return; }
       var M = (D.home && D.home.migrate) || { hi: {}, notes: {} };
       var hi = JSON.parse(localStorage.getItem('schemaHi') || '[]'); var nh = {};
       hi.forEach(function (k) { nh[M.hi[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(nh)));
@@ -15,8 +17,8 @@
       Object.keys(nt).forEach(function (k) { var to = M.notes[k] || k; out[to] = out[to] ? out[to] + '\n' + nt[k] : nt[k]; });
       localStorage.setItem('notes', JSON.stringify(out));
       localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl');
-      var M3 = M.hi2 || {}; var h3 = JSON.parse(localStorage.getItem('schemaHi') || '[]'), n3 = {}; h3.forEach(function (k) { n3[M3[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(n3)));
-      localStorage.setItem('dataVer', '114');
+      remapHi(MM.hi2 || {});
+      localStorage.setItem('dataVer', '117');
     } catch (e) {}
   })();
 
@@ -834,7 +836,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v115</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v117</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -874,7 +876,7 @@
       mini('discorsi', '🗣', 'Discorsi', scripts.length) + mini('diario', '📔', 'Diario', (D.diario || []).length) +
       mini('note', '📝', 'Note', Object.keys(notes).filter(function (k) { return notes[k]; }).length) +
       '<div class="mini" data-act="hi"><span class="mi">⭐</span><span class="ml">Evidenziate</span><span class="mn">' + hiCount() + '</span></div>' +
-      mini('preferiti', '❤️', 'Preferiti', fav.size) + '</div>';
+      mini('preferiti', '❤️', 'Preferiti', fav.size) + '</div>' + pendBar();
     out += '<div class="hgroup">Sezioni</div><div class="tiles">' +
       tile('regole', '📚', 'Regole', D.rules.length + ' regole') +
       tile('schemi', '📊', 'Schemi', (D.schemi ? D.schemi.length : 0) + ' tabelle') +
@@ -893,6 +895,11 @@
       '<label class="bigbtn alt implabel">⬆︎ Ripristina da un file<input type="file" accept=".json,application/json" id="bakimp" hidden></label>' +
       '<div class="lnote">«Salva tutto» crea un solo file con tutto ciò che hai fatto nell\'app. «Ripristina» lo rimette su qualunque dispositivo, senza cancellare ciò che c\'è già.</div>';
     return out;
+  }
+  function pendBar() {
+    var ns = persNames().filter(function (n) { return pendOpen(n).length; });
+    if (!ns.length) return '';
+    return '<div class="pendbar" data-act="gopend"><b>⏳ In sospeso (' + pendTotal() + ')</b> ' + ns.map(function (n) { return esc(n) + (pendOpen(n).length > 1 ? ' ×' + pendOpen(n).length : ''); }).join(' · ') + '<span class="chev">›</span></div>';
   }
   function mini(id, ic, label, n) {
     return '<div class="mini" data-act="go" data-arg="' + id + '"><span class="mi">' + ic + '</span><span class="ml">' + label + '</span><span class="mn">' + n + '</span></div>';
@@ -953,14 +960,50 @@
       (snD ? '<span class="cdesc snip">' + esc(snD) + '</span>' : '') + '</span><span class="chev">›</span></div>' +
       '<div class="body"><div class="body-in">' + body + noteBlock('d:' + e.id) + '</div></div></div>';
   }
+  /* ---------- Diario per persona + cose in sospeso ---------- */
+  var diaPers = 'Tutti', persDone = new Set(load('persDone', [])), persExtra = load('persExtra', {});
+  function savePers() { save('persDone', Array.from(persDone)); save('persExtra', persExtra); }
+  function persNames() {
+    var names = (D.persone || []).map(function (x) { return x.n; });
+    (D.diario || []).forEach(function (e) { var w = e.who || 'Altri'; if (names.indexOf(w) < 0) names.push(w); });
+    Object.keys(persExtra).forEach(function (w) { if (names.indexOf(w) < 0) names.push(w); });
+    return names;
+  }
+  function persPending(n) {
+    var base = ((D.persone || []).filter(function (x) { return x.n === n; })[0] || { s: [] }).s;
+    return base.concat(persExtra[n] || []);
+  }
+  function pendOpen(n) { return persPending(n).filter(function (x) { return !persDone.has(x.id); }); }
+  function pendTotal() { return persNames().reduce(function (a, n) { return a + pendOpen(n).length; }, 0); }
+  function pendBlock(n) {
+    var items = persPending(n);
+    var out = '<div class="pendbox"><div class="pendh">⏳ In sospeso con ' + esc(n) + '</div>';
+    if (!items.length) out += '<div class="pendnone">Niente in sospeso.</div>';
+    items.forEach(function (x) { var d = persDone.has(x.id); out += '<div class="pend' + (d ? ' done' : '') + '" data-act="pdone" data-arg="' + esc(x.id) + '"><span class="pk">' + (d ? '☑' : '☐') + '</span><span class="pt">' + esc(x.t) + '</span></div>'; });
+    return out + '<button class="lmini" data-act="padd" data-arg="' + esc(n) + '">＋ Aggiungi in sospeso</button></div>';
+  }
   function diarioBody(term) {
     var t = (term || '').toLowerCase(); snipTerm = t.trim();
-    var list = (D.diario || []).filter(function (e) { return !t || sm(JSON.stringify(e), t); }).slice().sort(function (a, b) { return b.part - a.part || (b.date || '').localeCompare(a.date || ''); });
-    var out = t ? '' : '<div class="lnote">Qui tengo la cronologia delle conversazioni: con chi, cosa ho scritto, la versione corretta e cosa è cambiato. Si aggiunge una voce a ogni nuova parte; per studiare usa Regole, Schemi e Vocabolario.</div>';
+    var cnt = {}; (D.diario || []).forEach(function (e) { var w = e.who || 'Altri'; cnt[w] = (cnt[w] || 0) + 1; });
+    var names = persNames().filter(function (n) { return cnt[n] || pendOpen(n).length || persPending(n).length; });
+    var pt = pendTotal();
+    var chips = '<div class="chips"><button class="chip2 ' + (diaPers === 'Tutti' ? 'on' : '') + '" data-act="dchip" data-arg="Tutti">Tutti</button>' +
+      '<button class="chip2 ' + (diaPers === 'sospeso' ? 'on' : '') + '" data-act="dchip" data-arg="sospeso">⏳ In sospeso (' + pt + ')</button>' +
+      names.map(function (n) { var po = pendOpen(n).length; return '<button class="chip2 ' + (diaPers === n ? 'on' : '') + '" data-act="dchip" data-arg="' + esc(n) + '">' + esc(n) + (po ? ' ⏳' : '') + ' (' + (cnt[n] || 0) + ')</button>'; }).join('') + '</div>';
+    if (!t && diaPers === 'sospeso') {
+      var o2 = chips; var any = false;
+      names.forEach(function (n) { if (pendOpen(n).length) { any = true; o2 += pendBlock(n); } });
+      return o2 + (any ? '' : '<div class="empty">Niente in sospeso con nessuno.</div>');
+    }
+    var list = (D.diario || []).filter(function (e) {
+      if (t) return sm(JSON.stringify(e), t);
+      return diaPers === 'Tutti' || (e.who || 'Altri') === diaPers;
+    }).slice().sort(function (a, b) { return (b.date || '').localeCompare(a.date || '') || b.part - a.part; });
+    var out = t ? '' : chips + (diaPers !== 'Tutti' ? pendBlock(diaPers) : '<div class="lnote">Qui tengo la cronologia delle conversazioni: con chi, cosa ho scritto, la versione corretta e cosa è cambiato. Tocca un nome per vedere solo quella persona e le cose in sospeso. Si aggiunge una voce a ogni nuova parte.</div>');
     if (!list.length) return out + '<div class="empty">Nessuna voce trovata.</div>';
     var last = null;
     list.forEach(function (e) {
-      if (e.part !== last) { out += '<div class="hgroup">Parte ' + e.part + (e.date ? ' · ' + esc(diaDate(e.date)) : '') + '</div>'; last = e.part; }
+      if (!t && diaPers === 'Tutti' && e.part !== last) { out += '<div class="hgroup">Parte ' + e.part + (e.date ? ' · ' + esc(diaDate(e.date)) : '') + '</div>'; last = e.part; }
       out += diarioCard(e, diaOpen.has(e.id));
     });
     return out;
@@ -1125,6 +1168,10 @@
     else if (act === 'srchwide') { searchInside = true; var qw = document.getElementById('q'), bw = document.getElementById('body'); if (qw && bw) runSearch(qw.value, bw); }
     else if (act === 'vochard') { vocHard = !vocHard; var qv = document.getElementById('q'); var bv = document.getElementById('body'); if (bv) bv.innerHTML = vocabBody(qv ? qv.value : ''); }
     else if (act === 'testitab') { testiTab = arg; var qt = document.getElementById('q'); if (qt) qt.value = ''; var bt = document.getElementById('body'); if (bt) bt.innerHTML = testiBody(''); window.scrollTo(0, 0); }
+    else if (act === 'dchip') { diaPers = arg; var qd = document.getElementById('q'); if (qd) qd.value = ''; var bd = document.getElementById('body'); if (bd) bd.innerHTML = diarioBody(''); window.scrollTo(0, 0); }
+    else if (act === 'pdone') { if (persDone.has(arg)) persDone.delete(arg); else persDone.add(arg); savePers(); var bp = document.getElementById('body'), qp = document.getElementById('q'); var y0 = window.scrollY; if (bp) bp.innerHTML = diarioBody(qp ? qp.value : ''); window.scrollTo(0, y0); }
+    else if (act === 'padd') { var tx = window.prompt('Cosa è in sospeso con ' + arg + '?'); if (tx && tx.trim()) { (persExtra[arg] = persExtra[arg] || []).push({ id: 'x' + Date.now(), t: tx.trim() }); savePers(); var bq = document.getElementById('body'); if (bq) bq.innerHTML = diarioBody(''); } }
+    else if (act === 'gopend') { diaPers = 'sospeso'; go('diario'); }
     else if (act === 'wtoggle') { var wb = el.closest('.wbox'); wOpen = !(wb && wb.classList.contains('open')); if (wb) wb.classList.toggle('open', wOpen); }
     else if (act === 'wchip') { wgroup = (wgroup === arg) ? '' : arg; var hb = document.getElementById('body'); if (hb) hb.innerHTML = homeBody(''); }
     else if (act === 'wlink') { wgroup = arg; go('home'); setTimeout(function () { var wb = document.getElementById('wbox'); if (wb) wb.scrollIntoView({ block: 'start' }); }, 60); }
