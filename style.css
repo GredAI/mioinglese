@@ -391,3 +391,4 @@ table.scheme td.tc-r .cex{color:#c0392b;font-weight:400}
 .accw{margin-top:4px;font-size:12.5px;color:#7a4a00}.accw b{color:#7a4a00}
 
 .wtry .wtnote{font-size:13px;color:var(--muted);margin:2px 0 6px}.wts{margin-top:8px;padding:8px 10px;border-radius:10px;background:#f4f4f7;font-size:15px}.wts.bad .wtl{color:#c62828}.wts.ok .wtl{color:#1f7a38}.wts .hi{color:#555;font-size:14px;margin-top:4px}a.wtclaude{display:inline-block;margin-top:10px;text-decoration:none}
+.wtry textarea.wit{min-height:64px;background:#fff8e6}

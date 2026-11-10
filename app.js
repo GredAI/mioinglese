@@ -855,7 +855,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v120</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v121</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -864,7 +864,7 @@
     if (l[0] === 's') { var i = schemaIdx(l[1]); return i < 0 ? null : { t: D.schemi[i].title, a: 'schema:' + l[1] }; }
     var r = D.rules.filter(function (x) { return x.n === l[1]; })[0]; return r ? { t: 'Regola ' + r.n + ' — ' + r.title, a: 'rule:' + r.n } : null;
   }
-  var wText = '', wRes = '';
+  var wText = load('wtext', ''), wIt = load('wit', ''), wRes = '';
   function checkExtra(t) {
     var h = [], s = ' ' + t.toLowerCase().replace(/[’]/g, "'") + ' ';
     if (/\bvocal (message|messages|note|notes)\b/.test(s)) h.push('“vocal message” non esiste: si dice voice message(s).');
@@ -888,7 +888,9 @@
   }
   function wTry() {
     return '<div class="card wtry"><div class="head"><span class="ctitle">✍️ Prova a scrivere</span></div>' +
-      '<div class="wtnote">Scrivi qui un testo seguendo le regole sopra, poi premi Controlla.</div>' +
+      '<div class="wtnote">🇮🇹 Da tradurre (promemoria in italiano, resta salvato)</div>' +
+      '<textarea id="wit" class="compose wit" placeholder="Cosa devo dire / tradurre…">' + esc(wIt) + '</textarea>' +
+      '<div class="wtnote">🇬🇧 Il tuo testo in inglese, poi premi Controlla</div>' +
       '<textarea id="wtext" class="compose" placeholder="Scrivi in inglese…">' + esc(wText) + '</textarea>' +
       '<div class="cbtns"><button class="cbtn check" data-act="wt-check">Controlla</button><button class="cbtn next" data-act="wt-clear">Cancella</button></div>' +
       '<div id="wres">' + wRes + '</div></div>';
@@ -1233,8 +1235,8 @@
     else if (act === 'pdone') { if (persDone.has(arg)) persDone.delete(arg); else persDone.add(arg); savePers(); var bp = document.getElementById('body'), qp = document.getElementById('q'); var y0 = window.scrollY; if (bp) bp.innerHTML = diarioBody(qp ? qp.value : ''); window.scrollTo(0, y0); }
     else if (act === 'padd') { var tx = window.prompt('Cosa è in sospeso con ' + arg + '?'); if (tx && tx.trim()) { (persExtra[arg] = persExtra[arg] || []).push({ id: 'x' + Date.now(), t: tx.trim() }); savePers(); var bq = document.getElementById('body'); if (bq) bq.innerHTML = diarioBody(''); } }
     else if (act === 'gopend') { diaPers = 'sospeso'; go('diario'); }
-    else if (act === 'wt-check') { var wt = document.getElementById('wtext'); wText = wt ? wt.value : ''; wRes = wtResult(); var wr = document.getElementById('wres'); if (wr) wr.innerHTML = wRes; }
-    else if (act === 'wt-clear') { wText = ''; wRes = ''; var wt2 = document.getElementById('wtext'); if (wt2) wt2.value = ''; var wr2 = document.getElementById('wres'); if (wr2) wr2.innerHTML = ''; }
+    else if (act === 'wt-check') { var wt = document.getElementById('wtext'); wText = wt ? wt.value : ''; save('wtext', wText); wRes = wtResult(); var wr = document.getElementById('wres'); if (wr) wr.innerHTML = wRes; }
+    else if (act === 'wt-clear') { wText = ''; save('wtext', ''); wRes = ''; var wt2 = document.getElementById('wtext'); if (wt2) wt2.value = ''; var wr2 = document.getElementById('wres'); if (wr2) wr2.innerHTML = ''; }
     else if (act === 'wtoggle') { var wb = el.closest('.wbox'); wOpen = !(wb && wb.classList.contains('open')); if (wb) wb.classList.toggle('open', wOpen); }
     else if (act === 'wchip') { wgroup = (wgroup === arg) ? '' : arg; var hb = document.getElementById('body'); if (hb) hb.innerHTML = homeBody(''); }
     else if (act === 'wlink') { wgroup = arg; go('home'); setTimeout(function () { var wb = document.getElementById('wbox'); if (wb) wb.scrollIntoView({ block: 'start' }); }, 60); }
@@ -1373,6 +1375,8 @@
     rd.readAsText(f);
   });
   document.addEventListener('input', function (e) {
+    if (e.target.id === 'wtext') { wText = e.target.value; save('wtext', wText); return; }
+    if (e.target.id === 'wit') { wIt = e.target.value; save('wit', wIt); return; }
     if (e.target.id === 'lq') { lexq = e.target.value; var rs = document.getElementById('lqres'); if (rs) rs.innerHTML = lqResults(); return; }
     if (e.target.id !== 'q') return;
     var b = document.getElementById('body'); if (!b) return;
