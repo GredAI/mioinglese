@@ -6,10 +6,24 @@
   (function () {
     try {
       var dv = localStorage.getItem('dataVer');
-      if (dv === '117') return;
+      if (dv === '119') return;
       var MM = (D.home && D.home.migrate) || {};
-      function remapHi(map) { var h = JSON.parse(localStorage.getItem('schemaHi') || '[]'), n = {}; h.forEach(function (k) { n[map[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(n))); }
-      if (dv === '116' || dv === '114' || dv === '110') { remapHi((dv === '116' ? MM.hi4 : dv === '114' ? MM.hi3 : MM.hi2) || {}); localStorage.setItem('dataVer', '117'); return; }
+      function remapKey(map, k) {
+        var q = k.lastIndexOf('||'); if (q < 0) return k;
+        var t = k.slice(0, q), ix = +k.slice(q + 2), e = map[t]; if (!e) return k;
+        if (e.x && e.x[ix]) return e.x[ix];
+        var jx = e.r ? e.r[ix] : null; return (jx === null || jx === undefined) ? k : e.t + '||' + jx;
+      }
+      function remapHi(map) { var h = JSON.parse(localStorage.getItem('schemaHi') || '[]'), n = {}; h.forEach(function (k) { n[remapKey(map, k)] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(n))); }
+      function renNotes() {
+        var R = MM.ren || {}, nt = JSON.parse(localStorage.getItem('notes') || '{}'), out = {};
+        Object.keys(nt).forEach(function (k) { var to = k.indexOf('s:') === 0 && R[k.slice(2)] ? 's:' + R[k.slice(2)] : k; out[to] = out[to] ? out[to] + '\n' + nt[k] : nt[k]; });
+        localStorage.setItem('notes', JSON.stringify(out));
+      }
+      if (dv === '118' || dv === '117' || dv === '116' || dv === '114' || dv === '110') {
+        remapHi((dv === '118' ? MM.hi6 : dv === '117' ? MM.hi5 : dv === '116' ? MM.hi4 : dv === '114' ? MM.hi3 : MM.hi2) || {}); renNotes();
+        localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl'); localStorage.setItem('dataVer', '119'); return;
+      }
       var M = (D.home && D.home.migrate) || { hi: {}, notes: {} };
       var hi = JSON.parse(localStorage.getItem('schemaHi') || '[]'); var nh = {};
       hi.forEach(function (k) { nh[M.hi[k] || k] = 1; }); localStorage.setItem('schemaHi', JSON.stringify(Object.keys(nh)));
@@ -17,8 +31,8 @@
       Object.keys(nt).forEach(function (k) { var to = M.notes[k] || k; out[to] = out[to] ? out[to] + '\n' + nt[k] : nt[k]; });
       localStorage.setItem('notes', JSON.stringify(out));
       localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl');
-      remapHi(MM.hi2 || {});
-      localStorage.setItem('dataVer', '117');
+      remapHi(MM.hi2 || {}); renNotes();
+      localStorage.setItem('dataVer', '119');
     } catch (e) {}
   })();
 
@@ -488,7 +502,8 @@
   function testiBody(term) {
     var t = (term || '').toLowerCase().trim(), nC = (D.schemi || []).filter(function (s) { return isConv(s.title); }).length;
     var tabs = '<div class="chips"><button class="chip2 ' + (testiTab === 'racc' ? 'on' : '') + '" data-act="testitab" data-arg="racc">📖 Racconti (' + D.racconti.length + ')</button>' +
-      '<button class="chip2 ' + (testiTab === 'conv' ? 'on' : '') + '" data-act="testitab" data-arg="conv">💬 Conversazioni (' + nC + ')</button></div>';
+      '<button class="chip2 ' + (testiTab === 'conv' ? 'on' : '') + '" data-act="testitab" data-arg="conv">💬 Conversazioni (' + nC + ')</button>' +
+      (testiTab === 'conv' || t ? '<button class="chip2 ' + (accOn ? 'on' : '') + '" data-act="acctoggle">🔤 Accenti e pronuncia: ' + (accOn ? 'sì' : 'no') + '</button>' : '') + '</div>';
     if (t) {
       var rl = raccList(t); schScope = 'conv'; var cl = schemiBody(t); schScope = 'gram';
       var out = tabs + (rl ? '<div class="hgroup">Racconti</div>' + rl : '') + (cl.indexOf('class="empty"') < 0 ? '<div class="hgroup">Conversazioni</div>' + cl : '');
@@ -576,14 +591,16 @@
   }
   var schCat = load('schCat', 'Tutti'), schOrd = load('schOrd', 'orig');
   var SCH_CATS = ['Tutti', 'Evidenziate', 'Promemoria', 'Grammatica', 'Tempi', 'Esercizi'];
-  var CONV_CATS = ['Tutti', 'Conversazione', 'Viaggio', 'Archivio chat'];
+  var CONV_CATS = ['Tutti', 'Conversazione', 'Viaggio', 'Persone', 'Archivio chat'];
+  var accOn = load('accOn', true);
   var schScope = 'gram', convCat = 'Tutti', testiTab = 'racc';
-  function isConv(title) { return /^(Conversazione|Chat|Viaggio)/.test(title); }
+  function isConv(title) { return /^(Conversazione|Archivio chat|Viaggio|Con )/.test(title); }
   if (SCH_CATS.indexOf(schCat) < 0) schCat = 'Tutti';
   function schemaCat(title) {
     if (/^Promemoria/.test(title)) return 'Promemoria';
     if (/^Conversazione/.test(title)) return 'Conversazione';
-    if (/^Chat/.test(title)) return 'Archivio chat';
+    if (/^Archivio chat/.test(title)) return 'Archivio chat';
+    if (/^Con /.test(title)) return 'Persone';
     if (/^Viaggio/.test(title)) return 'Viaggio';
     if (/^(Esercizio|Pensare semplice)/.test(title)) return 'Esercizi';
     if (/^(Tempi|Mappa dei tempi|Present Perfect|Passivo|Essere|Avere —|Have got|Soon to be)/.test(title)) return 'Tempi';
@@ -647,7 +664,9 @@
           var parts = String(c).split('\n');
           var ex = parts.length > 1 ? '<div class="cex">' + eh(parts.slice(1).join(' ')) + '</div>' : '';
           var tn = (hideT && ci === 0) ? '<div class="tent"><b>✗ Il mio tentativo:</b> ' + esc(attempt) + '</div>' : '';
-          return '<td class="tc-' + cc[ci] + '">' + tn + eh(parts[0]) + ex + '</td>';
+          var accH = '';
+          if (ci === 0 && accOn && D.accenti && isConv(s.title)) { var ac = D.accenti[hkey(s, ri)]; if (ac) accH = '<div class="acc">' + (ac.a ? '<div class="acca">🔤 ' + esc(ac.a) + '</div>' : '') + (ac.w ? '<div class="accw">⚠ ' + ac.w.map(function (x) { return '<b>' + esc(x[0]) + '</b> /' + esc(x[1]) + '/'; }).join(' · ') + '</div>' : '') + '</div>'; }
+          return '<td class="tc-' + cc[ci] + '">' + tn + eh(parts[0]) + accH + ex + '</td>';
         }).join('') + '<td class="scrtd">' + (hideT ? '<button class="tentbtn" data-act="tent" aria-label="Mostra il mio tentativo">✗</button>' : '') + '<button class="scradd" data-act="scradd" data-arg="' + esc(key).replace(/"/g, '&quot;') + '" aria-label="Aggiungi a un discorso">＋</button></td></tr>';
       }).join('');
       if (t && !shown && !(s.note && sm(s.note, t))) return '';
@@ -836,7 +855,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v117</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v119</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -1167,6 +1186,7 @@
     else if (act === 'dopen') { var cdd = el.closest('.card'), dOpen = cdd ? cdd.classList.contains('open') : diaOpen.has(arg); if (dOpen) { diaOpen.delete(arg); if (cdd) cdd.classList.remove('open'); } else { diaOpen.add(arg); if (cdd) cdd.classList.add('open'); } }
     else if (act === 'srchwide') { searchInside = true; var qw = document.getElementById('q'), bw = document.getElementById('body'); if (qw && bw) runSearch(qw.value, bw); }
     else if (act === 'vochard') { vocHard = !vocHard; var qv = document.getElementById('q'); var bv = document.getElementById('body'); if (bv) bv.innerHTML = vocabBody(qv ? qv.value : ''); }
+    else if (act === 'acctoggle') { accOn = !accOn; save('accOn', accOn); var qa2 = document.getElementById('q'), ba2 = document.getElementById('body'); if (ba2) ba2.innerHTML = testiBody(qa2 ? qa2.value : ''); }
     else if (act === 'testitab') { testiTab = arg; var qt = document.getElementById('q'); if (qt) qt.value = ''; var bt = document.getElementById('body'); if (bt) bt.innerHTML = testiBody(''); window.scrollTo(0, 0); }
     else if (act === 'dchip') { diaPers = arg; var qd = document.getElementById('q'); if (qd) qd.value = ''; var bd = document.getElementById('body'); if (bd) bd.innerHTML = diarioBody(''); window.scrollTo(0, 0); }
     else if (act === 'pdone') { if (persDone.has(arg)) persDone.delete(arg); else persDone.add(arg); savePers(); var bp = document.getElementById('body'), qp = document.getElementById('q'); var y0 = window.scrollY; if (bp) bp.innerHTML = diarioBody(qp ? qp.value : ''); window.scrollTo(0, y0); }
