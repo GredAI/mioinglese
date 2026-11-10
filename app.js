@@ -855,7 +855,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v119</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v120</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -863,6 +863,47 @@
   function linkTitle(l) {
     if (l[0] === 's') { var i = schemaIdx(l[1]); return i < 0 ? null : { t: D.schemi[i].title, a: 'schema:' + l[1] }; }
     var r = D.rules.filter(function (x) { return x.n === l[1]; })[0]; return r ? { t: 'Regola ' + r.n + ' — ' + r.title, a: 'rule:' + r.n } : null;
+  }
+  var wText = '', wRes = '';
+  function checkExtra(t) {
+    var h = [], s = ' ' + t.toLowerCase().replace(/[’]/g, "'") + ' ';
+    if (/\bvocal (message|messages|note|notes)\b/.test(s)) h.push('“vocal message” non esiste: si dice voice message(s).');
+    if (/\bno one (words?|things?|persons?|people)\b/.test(s)) h.push('“no one” = nessuno (persona). Con le cose: “I can’t remember any words”.');
+    if (/\b(if|when) (i|you|we|they|he|she|it) will\b/.test(s)) h.push('Dopo if / when: presente, non will (If I’m free, I’ll write).');
+    if (/\bi have been (to|in) [a-z ]+ in (19|20)\d\d\b/.test(s)) h.push('C’è una data → past simple (I went to Rome in 2019).');
+    if (/\b(my|the) [a-z ]{3,25} it (looks|sounds|seems|is|was)\b/.test(s)) h.push('Soggetto doppio: tolgo “it” (My English sounds better).');
+    if (/\b(it was|it is|it's) (great|good|nice|lovely|fine|bad|amazing),\s+(i|we|he|she|they)\b/.test(s)) h.push('Due frasi complete unite da una virgola: usa punto, and, but o so.');
+    if (/\blisten (music|podcasts?|songs?)\b/.test(s)) h.push('listen TO + oggetto (listen to music).');
+    if (/\bmore (good|well)\b|\bmore better\b/.test(s)) h.push('Comparativo: better, non more good / more better.');
+    return h;
+  }
+  function checkText(t) {
+    var parts = t.replace(/\s+/g, ' ').match(/[^.!?]+[.!?]*/g) || [], out = [];
+    parts.forEach(function (p) {
+      p = p.trim(); if (!p) return;
+      var m = checkSentence(p).concat(checkExtra(p)).filter(function (x, i, a) { return a.indexOf(x) === i; });
+      out.push({ s: p, m: m });
+    });
+    return out;
+  }
+  function wTry() {
+    return '<div class="card wtry"><div class="head"><span class="ctitle">✍️ Prova a scrivere</span></div>' +
+      '<div class="wtnote">Scrivi qui un testo seguendo le regole sopra, poi premi Controlla.</div>' +
+      '<textarea id="wtext" class="compose" placeholder="Scrivi in inglese…">' + esc(wText) + '</textarea>' +
+      '<div class="cbtns"><button class="cbtn check" data-act="wt-check">Controlla</button><button class="cbtn next" data-act="wt-clear">Cancella</button></div>' +
+      '<div id="wres">' + wRes + '</div></div>';
+  }
+  function wtResult() {
+    if (!wText.trim()) return '<div class="hint2">Scrivi prima qualcosa.</div>';
+    var r = checkText(wText), n = 0;
+    var body = r.map(function (x) {
+      n += x.m.length;
+      return '<div class="wts' + (x.m.length ? ' bad' : ' ok') + '"><div class="wtl">' + (x.m.length ? '✗ ' : '✓ ') + esc(x.s) + '</div>' +
+        x.m.map(function (h) { return '<div class="hi">→ ' + esc(h) + '</div>'; }).join('') + '</div>';
+    }).join('');
+    var q = 'Correggi questo testo in inglese (sono una studentessa italiana, livello circa B1). Mostra la versione corretta, le correzioni principali e le regole, in italiano:\n\n' + wText;
+    return '<div class="hint2 ' + (n ? 'warn' : 'ok') + '"><b>' + (n ? n + ' punto/i da controllare' : 'Nessun errore tipico rilevato') + '</b></div>' + body +
+      '<a class="cbtn check wtclaude" target="_blank" rel="noopener" href="https://claude.ai/new?q=' + encodeURIComponent(q) + '">✨ Fai correggere a Claude</a>';
   }
   function writeBox() {
     var H = D.home || {}, ps = (D.schemi || []).filter(function (s) { return s.title.indexOf('Pensare semplice') === 0; })[0];
@@ -885,7 +926,7 @@
       '<div class="wlk" data-act="go2" data-arg="schema:Pensare semplice"><span>Apri la card completa</span><span class="chev">›</span></div>' +
       '<div class="wchk"><div class="wchead">✅ Prima di inviare, controlla</div>' + chk + '</div>' +
       '<div class="wchead" style="margin-top:14px">🧭 Cosa vuoi dire?</div><div class="chips wchips">' + chips + '</div>' + panel + '</div></div>' +
-      '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti</span><span class="chev">›</span></div></div>';
+      wTry() + '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti</span><span class="chev">›</span></div></div>';
   }
   function homeBody(term) {
     if (term && term.trim()) return searchAll(term.trim().toLowerCase());
@@ -1192,6 +1233,8 @@
     else if (act === 'pdone') { if (persDone.has(arg)) persDone.delete(arg); else persDone.add(arg); savePers(); var bp = document.getElementById('body'), qp = document.getElementById('q'); var y0 = window.scrollY; if (bp) bp.innerHTML = diarioBody(qp ? qp.value : ''); window.scrollTo(0, y0); }
     else if (act === 'padd') { var tx = window.prompt('Cosa è in sospeso con ' + arg + '?'); if (tx && tx.trim()) { (persExtra[arg] = persExtra[arg] || []).push({ id: 'x' + Date.now(), t: tx.trim() }); savePers(); var bq = document.getElementById('body'); if (bq) bq.innerHTML = diarioBody(''); } }
     else if (act === 'gopend') { diaPers = 'sospeso'; go('diario'); }
+    else if (act === 'wt-check') { var wt = document.getElementById('wtext'); wText = wt ? wt.value : ''; wRes = wtResult(); var wr = document.getElementById('wres'); if (wr) wr.innerHTML = wRes; }
+    else if (act === 'wt-clear') { wText = ''; wRes = ''; var wt2 = document.getElementById('wtext'); if (wt2) wt2.value = ''; var wr2 = document.getElementById('wres'); if (wr2) wr2.innerHTML = ''; }
     else if (act === 'wtoggle') { var wb = el.closest('.wbox'); wOpen = !(wb && wb.classList.contains('open')); if (wb) wb.classList.toggle('open', wOpen); }
     else if (act === 'wchip') { wgroup = (wgroup === arg) ? '' : arg; var hb = document.getElementById('body'); if (hb) hb.innerHTML = homeBody(''); }
     else if (act === 'wlink') { wgroup = arg; go('home'); setTimeout(function () { var wb = document.getElementById('wbox'); if (wb) wb.scrollIntoView({ block: 'start' }); }, 60); }
