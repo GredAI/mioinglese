@@ -855,7 +855,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v122</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v123</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -1374,6 +1374,60 @@
     };
     rd.readAsText(f);
   });
+
+  /* ---- Tooltip parola (passa il mouse o tocca) ---- */
+  var wmap = null, wtip = null, wlast = '';
+  function wmapBuild() {
+    wmap = {};
+    (D.vocab || []).forEach(function (d) {
+      var k = (d.en || '').toLowerCase().replace(/^to\s+/, '').replace(/\s*\(.*\)$/, '').trim();
+      if (k && /^[a-z'’-]+$/.test(k) && !wmap[k]) wmap[k] = d;
+    });
+    (D.racconti || []).forEach(function (r) { r.blocks.forEach(function (b) { if (b.t === 'pron') b.items.forEach(function (p) {
+      var k = p.w.toLowerCase(); if (/^[a-z'’-]+$/.test(k) && !wmap[k]) wmap[k] = { en: p.w, it: '', extra: p.h.replace(/\s+[—–-]\s+.*$/, '') + ' ' + (p.h.indexOf('—') > -1 ? '' : '') };
+    }); }); });
+  }
+  function wordInfo(w) {
+    if (!wmap) wmapBuild();
+    w = w.toLowerCase().replace(/’/g, "'");
+    var c = [w, w + 's', w.replace(/'s$/, ''), w.replace(/s$/, ''), w.replace(/es$/, ''), w.replace(/ies$/, 'y'), w.replace(/ed$/, ''), w.replace(/ed$/, 'e'), w.replace(/d$/, ''), w.replace(/ied$/, 'y'), w.replace(/ing$/, ''), w.replace(/ing$/, 'e'), w.replace(/([a-z])\1ing$/, '$1'), w.replace(/([a-z])\1ed$/, '$1'), w.replace(/ly$/, '')];
+    for (var i = 0; i < c.length; i++) if (c[i].length > 1 && wmap[c[i]]) return wmap[c[i]];
+    return null;
+  }
+  function wordAt(x, y) {
+    var r = null, n, o;
+    if (document.caretRangeFromPoint) r = document.caretRangeFromPoint(x, y);
+    else if (document.caretPositionFromPoint) { var p = document.caretPositionFromPoint(x, y); if (p) { r = document.createRange(); r.setStart(p.offsetNode, p.offset); } }
+    if (!r || !r.startContainer || r.startContainer.nodeType !== 3) return null;
+    n = r.startContainer; o = r.startOffset;
+    var t = n.nodeValue, a = o, b = o, W = /[A-Za-z'’]/;
+    while (a > 0 && W.test(t.charAt(a - 1))) a--;
+    while (b < t.length && W.test(t.charAt(b))) b++;
+    var w = t.slice(a, b).replace(/^['’]+|['’]+$/g, '');
+    return w.length > 1 ? w : null;
+  }
+  function wtipHide() { if (wtip) wtip.style.display = 'none'; wlast = ''; }
+  function wtipShow(w, x, y) {
+    var d = wordInfo(w); if (!d) { wtipHide(); return; }
+    if (wlast === w) return; wlast = w;
+    if (!wtip) { wtip = document.createElement('div'); wtip.className = 'wtip'; document.body.appendChild(wtip); }
+    var sp = vsplit(d.extra), pr = (sp.pr || '').replace(/^⚠\s*/, '');
+    wtip.innerHTML = '<b>' + esc(d.en) + '</b>' + (d.it ? ' — ' + esc(d.it) : '') + (pr ? '<div class="wtp">🔊 ' + esc(pr) + '</div>' : '');
+    wtip.style.display = 'block';
+    var wd = wtip.offsetWidth, lx = Math.max(8, Math.min(x - wd / 2, window.innerWidth - wd - 8));
+    wtip.style.left = lx + 'px'; wtip.style.top = Math.max(8, y - wtip.offsetHeight - 14) + 'px';
+  }
+  function wtipEv(e) {
+    var t = e.target;
+    if (!t.closest || !t.closest('.plain,.marked,td,.exline,.acc,.scrtext,.ex')) { if (e.type === 'click') wtipHide(); return; }
+    var w = wordAt(e.clientX, e.clientY);
+    if (w) wtipShow(w, e.clientX, e.clientY); else wtipHide();
+  }
+  window._wordInfo = wordInfo;
+  document.addEventListener('mouseover', function (e) { if (e.buttons) return; wtipEv(e); });
+  document.addEventListener('mousemove', function (e) { if (e.target.closest && e.target.closest('.plain,.marked,td,.exline,.acc,.scrtext,.ex')) wtipEv(e); else wtipHide(); });
+  document.addEventListener('click', wtipEv);
+  document.addEventListener('scroll', wtipHide, true);
   document.addEventListener('input', function (e) {
     if (e.target.id === 'wtext') { wText = e.target.value; save('wtext', wText); return; }
     if (e.target.id === 'wit') { wIt = e.target.value; save('wit', wIt); return; }

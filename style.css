@@ -392,3 +392,4 @@ table.scheme td.tc-r .cex{color:#c0392b;font-weight:400}
 
 .wtry .wtnote{font-size:13px;color:var(--muted);margin:2px 0 6px}.wts{margin-top:8px;padding:8px 10px;border-radius:10px;background:#f4f4f7;font-size:15px}.wts.bad .wtl{color:#c62828}.wts.ok .wtl{color:#1f7a38}.wts .hi{color:#555;font-size:14px;margin-top:4px}a.wtclaude{display:inline-block;margin-top:10px;text-decoration:none}
 .wtry textarea.wit{min-height:64px;background:#fff8e6}
+.wtip{position:fixed;z-index:9999;max-width:260px;background:#2b2150;color:#fff;border-radius:10px;padding:8px 11px;font-size:14px;line-height:1.4;box-shadow:0 4px 14px rgba(0,0,0,.25);pointer-events:none;display:none}.wtip .wtp{color:#d8c9ff;margin-top:3px;font-size:13px}
