@@ -6,7 +6,7 @@
   (function () {
     try {
       var dv = localStorage.getItem('dataVer');
-      if (dv === '119') return;
+      if (dv === '124') return;
       var MM = (D.home && D.home.migrate) || {};
       function remapKey(map, k) {
         var q = k.lastIndexOf('||'); if (q < 0) return k;
@@ -20,9 +20,9 @@
         Object.keys(nt).forEach(function (k) { var to = k.indexOf('s:') === 0 && R[k.slice(2)] ? 's:' + R[k.slice(2)] : k; out[to] = out[to] ? out[to] + '\n' + nt[k] : nt[k]; });
         localStorage.setItem('notes', JSON.stringify(out));
       }
-      if (dv === '118' || dv === '117' || dv === '116' || dv === '114' || dv === '110') {
-        remapHi((dv === '118' ? MM.hi6 : dv === '117' ? MM.hi5 : dv === '116' ? MM.hi4 : dv === '114' ? MM.hi3 : MM.hi2) || {}); renNotes();
-        localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl'); localStorage.setItem('dataVer', '119'); return;
+      if (dv === '119' || dv === '118' || dv === '117' || dv === '116' || dv === '114' || dv === '110') {
+        remapHi((dv === '119' ? MM.hi7 : dv === '118' ? MM.hi6 : dv === '117' ? MM.hi5 : dv === '116' ? MM.hi4 : dv === '114' ? MM.hi3 : MM.hi2) || {}); renNotes();
+        localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl'); localStorage.setItem('dataVer', '124'); return;
       }
       var M = (D.home && D.home.migrate) || { hi: {}, notes: {} };
       var hi = JSON.parse(localStorage.getItem('schemaHi') || '[]'); var nh = {};
@@ -32,7 +32,7 @@
       localStorage.setItem('notes', JSON.stringify(out));
       localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl');
       remapHi(MM.hi2 || {}); renNotes();
-      localStorage.setItem('dataVer', '119');
+      localStorage.setItem('dataVer', '124');
     } catch (e) {}
   })();
 
@@ -855,7 +855,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v123</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v124</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -907,6 +907,15 @@
     return '<div class="hint2 ' + (n ? 'warn' : 'ok') + '"><b>' + (n ? n + ' punto/i da controllare' : 'Nessun errore tipico rilevato') + '</b></div>' + body +
       '<a class="cbtn check wtclaude" target="_blank" rel="noopener" href="https://claude.ai/new?q=' + encodeURIComponent(q) + '">✨ Fai correggere a Claude</a>';
   }
+  function think3() {
+    var T = [['data o «ieri»', 'past simple'], ['da…, e continua', 'present perfect continuous'], ['era già successo', 'past perfect'], ['sta succedendo ora', 'present continuous'], ['abitudine', 'present simple'], ['lampo / piano / appuntamento', 'will · going to · present continuous']];
+    return '<div class="card think3"><div class="head"><span class="ctitle">🧩 Prima di scrivere: 3 domande</span></div>' +
+      '<div class="wstep"><span class="wn">1</span><b>Chi fa cosa?</b> Scegli un soggetto e un verbo semplice. Non cercare ancora le parole italiane.</div>' +
+      '<div class="wstep"><span class="wn">2</span><b>Quando?</b> L’etichetta sceglie il tempo:<div class="t3chips">' + T.map(function (t) { return '<span class="t3"><i>' + esc(t[0]) + '</i> → <b>' + esc(t[1]) + '</b></span>'; }).join('') + '</div>' +
+      '<div class="wlk" data-act="go2" data-arg="schema:Mappa dei tempi"><span>Apri la Mappa dei tempi</span><span class="chev">›</span></div></div>' +
+      '<div class="wstep"><span class="wn">3</span><b>Con parole che conosco?</b> Se manca una parola, dì lo stesso concetto in modo più semplice: «I\'m very busy» invece di cercare «sono sommersa di lavoro».</div>' +
+      '<div class="wtnote">Esercizio: nel campo «Da tradurre» scrivi la situazione in italiano, poi scrivi in inglese senza riguardare l’italiano; solo dopo controlla.</div></div>';
+  }
   function writeBox() {
     var H = D.home || {}, ps = (D.schemi || []).filter(function (s) { return s.title.indexOf('Pensare semplice') === 0; })[0];
     var steps = ps ? ps.rows.filter(function (r) { return /^[0-5]\./.test(r[0]); }).map(function (r) {
@@ -928,7 +937,7 @@
       '<div class="wlk" data-act="go2" data-arg="schema:Pensare semplice"><span>Apri la card completa</span><span class="chev">›</span></div>' +
       '<div class="wchk"><div class="wchead">✅ Prima di inviare, controlla</div>' + chk + '</div>' +
       '<div class="wchead" style="margin-top:14px">🧭 Cosa vuoi dire?</div><div class="chips wchips">' + chips + '</div>' + panel + '</div></div>' +
-      wTry() + '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti</span><span class="chev">›</span></div></div>';
+      think3() + wTry() + '<div class="card" data-act="go2" data-arg="schema:Promemoria"><div class="head"><span class="ctitle">🔴 Promemoria — i miei errori ricorrenti</span><span class="chev">›</span></div></div>';
   }
   function homeBody(term) {
     if (term && term.trim()) return searchAll(term.trim().toLowerCase());
