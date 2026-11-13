@@ -6,7 +6,7 @@
   (function () {
     try {
       var dv = localStorage.getItem('dataVer');
-      if (dv === '124') return;
+      if (dv === '125') return;
       var MM = (D.home && D.home.migrate) || {};
       function remapKey(map, k) {
         var q = k.lastIndexOf('||'); if (q < 0) return k;
@@ -20,9 +20,9 @@
         Object.keys(nt).forEach(function (k) { var to = k.indexOf('s:') === 0 && R[k.slice(2)] ? 's:' + R[k.slice(2)] : k; out[to] = out[to] ? out[to] + '\n' + nt[k] : nt[k]; });
         localStorage.setItem('notes', JSON.stringify(out));
       }
-      if (dv === '119' || dv === '118' || dv === '117' || dv === '116' || dv === '114' || dv === '110') {
-        remapHi((dv === '119' ? MM.hi7 : dv === '118' ? MM.hi6 : dv === '117' ? MM.hi5 : dv === '116' ? MM.hi4 : dv === '114' ? MM.hi3 : MM.hi2) || {}); renNotes();
-        localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl'); localStorage.setItem('dataVer', '124'); return;
+      if (dv === '124' || dv === '119' || dv === '118' || dv === '117' || dv === '116' || dv === '114' || dv === '110') {
+        remapHi((dv === '124' ? MM.hi8 : dv === '119' ? MM.hi7 : dv === '118' ? MM.hi6 : dv === '117' ? MM.hi5 : dv === '116' ? MM.hi4 : dv === '114' ? MM.hi3 : MM.hi2) || {}); renNotes();
+        localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl'); localStorage.setItem('dataVer', '125'); return;
       }
       var M = (D.home && D.home.migrate) || { hi: {}, notes: {} };
       var hi = JSON.parse(localStorage.getItem('schemaHi') || '[]'); var nh = {};
@@ -32,7 +32,7 @@
       localStorage.setItem('notes', JSON.stringify(out));
       localStorage.removeItem('listenSel'); localStorage.removeItem('listenExcl');
       remapHi(MM.hi2 || {}); renNotes();
-      localStorage.setItem('dataVer', '124');
+      localStorage.setItem('dataVer', '125');
     } catch (e) {}
   })();
 
@@ -855,7 +855,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v124</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v125</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
