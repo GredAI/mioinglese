@@ -385,6 +385,7 @@
     if (route.name === 'discorso') return scrScreen(route.arg);
     if (route.name === 'racc') return raccDetail(route.arg);
     if (route.name === 'preferiti') return preferitiScreen();
+    if (route.name === 'allena') return alScreen();
     if (route.name === 'componi') return componiScreen();
     if (route.name === 'composed') return composedScreen();
     return home();
@@ -766,6 +767,105 @@
     return topBar('Flashcard') + '<main>' + seg + body + '</main>';
   }
 
+
+  /* ---------- Allenamento tempi ---------- */
+  var alMode = 'f', alCur = null, alOnlyErr = false, alSeen = {};
+  function alStat() { return load('allenaStat', { n: 0, ok: 0, err: {} }); }
+  function alPick() {
+    var A = D.allena; if (!A) return null;
+    var st = alStat(), pool = [];
+    if (alMode === 's') pool = A.S.map(function (x, i) { return { k: 's' + i, x: x }; });
+    else pool = A.I.map(function (x, i) { return { k: 'i' + i, x: x }; });
+    if (alOnlyErr) { var e = pool.filter(function (p) { return st.err[p.k]; }); if (e.length) pool = e; }
+    var fresh = pool.filter(function (p) { return !alSeen[p.k]; });
+    if (!fresh.length) { alSeen = {}; fresh = pool; }
+    var errs = fresh.filter(function (p) { return st.err[p.k]; });
+    var c = (errs.length && Math.random() < 0.5) ? errs : fresh;
+    var p = c[Math.floor(Math.random() * c.length)]; alSeen[p.k] = 1; return p;
+  }
+  function alOpts(id, sel) {
+    var A = D.allena, h = '<option value="">— scegli —</option>';
+    return '<select id="' + id + '" class="alsel">' + h + (id === 'al-t' ? A.T.map(function (t) { return '<option value="' + t.id + '">' + esc(t.n) + '</option>'; }).join('') : A.M.map(function (m) { return '<option value="' + m.id + '">' + esc(m.n) + '</option>'; }).join('')) + '</select>';
+  }
+  function alNorm(w) {
+    w = w.toLowerCase().replace(/[’]/g, "'").replace(/[^a-z0-9']/g, '');
+    if (!w) return [];
+    var sp = { "won't": ['will', 'not'], "can't": ['can', 'not'], "cannot": ['can', 'not'], "i'm": ['i', 'am'], "i've": ['i', 'have'], "i'll": ['i', 'will'], "i'd": ['i', 'would'], "it's": ['it', 'is'], "that's": ['that', 'is'], "he's": ['he', 'is'], "she's": ['she', 'is'], "we've": ['we', 'have'], "you've": ['you', 'have'], "they've": ['they', 'have'], "we're": ['we', 'are'], "you're": ['you', 'are'], "they're": ['they', 'are'], "he'll": ['he', 'will'], "she'll": ['she', 'will'], "we'll": ['we', 'will'], "you'll": ['you', 'will'] };
+    if (sp[w]) return sp[w];
+    if (/n't$/.test(w)) return [w.slice(0, -3), 'not'];
+    return [w];
+  }
+  function alToks(str) {
+    var out = [];
+    (str || '').split(/\s+/).forEach(function (w, wi) { alNorm(w).forEach(function (t) { out.push({ t: t, w: wi }); }); });
+    return out;
+  }
+  function alDiff(user, ref) {
+    var a = alToks(user), b = alToks(ref), n = a.length, m = b.length, L = [], i, j;
+    for (i = 0; i <= n; i++) { L[i] = []; for (j = 0; j <= m; j++) L[i][j] = 0; }
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) L[i][j] = a[i].t === b[j].t ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+    var bad = {}, ok = {}; i = 0; j = 0;
+    while (i < n && j < m) { if (a[i].t === b[j].t) { ok[a[i].w] = 1; i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) { bad[a[i].w] = 1; i++; } else j++; }
+    while (i < n) { bad[a[i].w] = 1; i++; }
+    var words = (user || '').split(/\s+/).filter(Boolean);
+    var missing = m - (function () { var c = 0; i = 0; j = 0; while (i < n && j < m) { if (a[i].t === b[j].t) { c++; i++; j++; } else if (L[i + 1][j] >= L[i][j + 1]) i++; else j++; } return c; })();
+    return { html: words.map(function (w, k) { return bad[k] ? '<span class="bad">' + esc(w) + '</span>' : esc(w); }).join(' '), nbad: Object.keys(bad).length, missing: missing };
+  }
+  function alName(list, id) { for (var i = 0; i < list.length; i++) if (list[i].id === id) return list[i].n; return id; }
+  function alHi(en, sp) {
+    var h = esc(en); if (!sp) return h;
+    sp.split(/ \/ | · /).forEach(function (w) { w = w.replace(/\s*\(.*\)/, '').replace(/…/g, ''); if (w.length > 1) { var r = new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'i'); h = h.replace(r, '<mark class="magic">$1</mark>'); } });
+    return h;
+  }
+  function alCard() {
+    var A = D.allena; if (!A) return '<div class="note">Dati non disponibili.</div>';
+    if (!alCur) alCur = alPick(); var c = alCur, x = c.x, st = alStat();
+    var q = '';
+    if (alMode === 'f') q = '<div class="alq">' + esc(x.en) + '</div><div class="alhint">Che tempo è e perché?</div>';
+    else if (alMode === 's') q = '<div class="alq"><mark class="magic">' + esc(x.w) + '</mark></div><div class="alhint">' + esc(x.g) + ' — a quale tempo ti fa pensare?</div>';
+    else q = '<div class="alq">' + esc(x.it) + '</div><div class="alhint">Scegli il tempo e il motivo, poi scrivi la frase in inglese.</div>';
+    return '<div class="card alcard">' + q +
+      '<label class="allab">Tempo</label>' + alOpts('al-t') + '<label class="allab">Motivo</label>' + alOpts('al-m') +
+      (alMode === 'f' ? '<label class="allab">Con le tue parole (facoltativo)</label><textarea id="al-w" class="compose alta" placeholder="es. abitudine, parola spia: three times a week"></textarea>' : '') +
+      (alMode === 't' ? '<label class="allab">La tua frase in inglese</label><textarea id="al-s" class="compose alta" placeholder="Scrivi la frase…"></textarea>' : '') +
+      '<div class="cbtns"><button class="cbtn check" data-act="al-check">Controlla</button><button class="cbtn save" data-act="al-show">Mostra</button><button class="cbtn next" data-act="al-next">Prossima →</button></div>' +
+      '<div id="alres"></div></div>';
+  }
+  function alScreen() {
+    var st = alStat(), ne = Object.keys(st.err).length;
+    var tabs = [['f', 'Frase → motivo'], ['s', 'Parola magica'], ['t', 'Italiano → frase']].map(function (m) { return '<button class="chip2' + (alMode === m[0] ? ' on' : '') + '" data-act="al-mode" data-arg="' + m[0] + '">' + m[1] + '</button>'; }).join('');
+    return topBar('Allenamento tempi', 'home') + '<main class="fade"><div class="chips wchips">' + tabs + '</div>' +
+      '<div class="alstat">✓ ' + st.ok + ' su ' + st.n + ' · da ripassare: ' + ne + ' <button class="chip2' + (alOnlyErr ? ' on' : '') + '" data-act="al-only">solo errori</button>' + (st.n ? ' <button class="chip2" data-act="al-reset">azzera</button>' : '') + '</div>' +
+      '<div id="alwrap">' + alCard() + '</div></main>';
+  }
+  function alCheck() {
+    var A = D.allena, c = alCur; if (!c) return; var x = c.x, tv = (document.getElementById('al-t') || {}).value, mv = (document.getElementById('al-m') || {}).value;
+    var out = '', ok = false, tOk, mOk;
+    if (alMode === 's') { tOk = x.t.indexOf(tv) > -1; mOk = mv === x.m; }
+    else { tOk = tv === x.t; mOk = mv === x.m; }
+    var tn = alMode === 's' ? x.t.map(function (i) { return alName(A.T, i); }).join(' / ') : alName(A.T, x.t), mn = alName(A.M, x.m);
+    if (!tv && !mv && alMode !== 't') { document.getElementById('alres').innerHTML = '<div class="hint2">Scegli almeno il tempo e il motivo.</div>'; return; }
+    var all = tOk && mOk, tx = null;
+    out += '<div class="alr ' + (tOk ? 'ok' : 'no') + '">' + (tOk ? '✓' : '✗') + ' Tempo' + (tOk ? '' : ': controlla il tempo') + '</div>';
+    out += '<div class="alr ' + (mOk ? 'ok' : 'no') + '">' + (mOk ? '✓' : '✗') + ' Motivo' + (mOk ? '' : ': controlla il motivo') + '</div>';
+    if (alMode === 't') {
+      var us = (document.getElementById('al-s') || {}).value || '';
+      if (!us.trim()) out += '<div class="hint2">Scrivi anche la frase in inglese.</div>';
+      else { var df = alDiff(us, x.en); tx = df.nbad === 0 && df.missing === 0;
+        out += '<div class="alr ' + (tx ? 'ok' : 'no') + '">' + (tx ? '✓' : '✗') + ' Frase: ' + df.html + (tx ? '' : '<div class="alnote">Controlla le parole in rosso' + (df.missing > 0 ? (df.nbad ? ' e ciò che manca' : ': manca qualcosa') : '') + ' (la correzione non è mostrata: provane un\'altra, o tocca «Mostra»).</div>') + '</div>'; all = all && tx; }
+    }
+    var t = alStat(); t.n++; if (all) t.ok++; if (all) delete t.err[c.k]; else t.err[c.k] = 1; save('allenaStat', t);
+    out += '<div class="alwhy">' + (all ? '👏 ' : '') + esc(alMode === 's' ? x.why : x.why) + '</div>';
+    document.getElementById('alres').innerHTML = out;
+    var s2 = document.querySelector('.alstat'); if (s2) s2.firstChild.nodeValue = '✓ ' + t.ok + ' su ' + t.n + ' · da ripassare: ' + Object.keys(t.err).length + ' ';
+  }
+  function alShow() {
+    var A = D.allena, c = alCur; if (!c) return; var x = c.x, tn = alMode === 's' ? x.t.map(function (i) { return alName(A.T, i); }).join(' / ') : alName(A.T, x.t);
+    var f = alMode === 's' ? '' : (function () { for (var i = 0; i < A.T.length; i++) if (A.T[i].id === x.t) return A.T[i].f; return ''; })();
+    var h = alMode === 's' ? '' : '<div class="alr">' + alHi(x.en, x.sp) + '</div><div class="alnote">' + esc(x.it) + '</div>';
+    document.getElementById('alres').innerHTML = h + '<div class="alr"><b>' + esc(tn) + '</b>' + (f ? ' <span class="alf">' + esc(f) + '</span>' : '') + '<br>Motivo: ' + esc(alName(A.M, x.m)) + '</div><div class="alwhy">' + esc(x.why) + '</div>';
+  }
+
   /* ---------- Frase del giorno (componi) ---------- */
   var composePrompt = null;
   function pickCompose() { var p = flashPool(); composePrompt = p[Math.floor(Math.random() * p.length)]; }
@@ -855,7 +955,7 @@
 
   /* ---------- home ---------- */
   function home() {
-    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v125</span></div>' +
+    return '<div class="top"><span class="title">Il mio inglese</span><span class="spacer"></span><span style="color:#b0b0b6;font-size:12px;font-weight:600">v126</span></div>' +
       '<div class="search"><input id="q" type="search" placeholder="Cerca ovunque (regole, parole, racconti…)" autocomplete="off"></div>' +
       '<main class="fade" id="body">' + homeBody('') + '</main>';
   }
@@ -912,7 +1012,7 @@
     return '<div class="card think3"><div class="head"><span class="ctitle">🧩 Prima di scrivere: 3 domande</span></div>' +
       '<div class="wstep"><span class="wn">1</span><b>Chi fa cosa?</b> Scegli un soggetto e un verbo semplice. Non cercare ancora le parole italiane.</div>' +
       '<div class="wstep"><span class="wn">2</span><b>Quando?</b> L’etichetta sceglie il tempo:<div class="t3chips">' + T.map(function (t) { return '<span class="t3"><i>' + esc(t[0]) + '</i> → <b>' + esc(t[1]) + '</b></span>'; }).join('') + '</div>' +
-      '<div class="wlk" data-act="go2" data-arg="schema:Mappa dei tempi"><span>Apri la Mappa dei tempi</span><span class="chev">›</span></div></div>' +
+      '<div class="wlk" data-act="go2" data-arg="schema:Mappa dei tempi"><span>Apri la Mappa dei tempi</span><span class="chev">›</span></div><div class="wlk" data-act="go" data-arg="allena"><span>🎯 Allenati sui tempi</span><span class="chev">›</span></div></div>' +
       '<div class="wstep"><span class="wn">3</span><b>Con parole che conosco?</b> Se manca una parola, dì lo stesso concetto in modo più semplice: «I\'m very busy» invece di cercare «sono sommersa di lavoro».</div>' +
       '<div class="wtnote">Esercizio: nel campo «Da tradurre» scrivi la situazione in italiano, poi scrivi in inglese senza riguardare l’italiano; solo dopo controlla.</div></div>';
   }
@@ -958,6 +1058,7 @@
       tile('phrasal', '🔗', 'Phrasal verbs', (D.phrasal ? D.phrasal.length : 0) + ' verbi') +
       tile('irregolari', '🔁', 'Verbi irregolari', (D.irregolari ? D.irregolari.length : 0) + ' verbi') +
       tile('flashcard', '🃏', 'Flashcard', 'Ripassa') +
+      tile('allena', '🎯', 'Allenamento tempi', 'motivi e parole magiche') +
       tile('componi', '✍️', 'Frase del giorno', 'Esercitati') +
       tile('canzoni', '🎵', 'Canzoni', D.canzoni.length + ' brani') +
       tile('racconti', '📖', 'Testi', D.racconti.length + ' racconti, ' + (D.schemi || []).filter(function (x) { return isConv(x.title); }).length + ' conversazioni') +
@@ -1246,6 +1347,12 @@
     else if (act === 'gopend') { diaPers = 'sospeso'; go('diario'); }
     else if (act === 'wt-check') { var wt = document.getElementById('wtext'); wText = wt ? wt.value : ''; save('wtext', wText); wRes = wtResult(); var wr = document.getElementById('wres'); if (wr) wr.innerHTML = wRes; }
     else if (act === 'wt-clear') { wText = ''; save('wtext', ''); wRes = ''; var wt2 = document.getElementById('wtext'); if (wt2) wt2.value = ''; var wr2 = document.getElementById('wres'); if (wr2) wr2.innerHTML = ''; }
+    else if (act === 'al-mode') { alMode = arg; alCur = null; alSeen = {}; render(); }
+    else if (act === 'al-next') { alCur = alPick(); var aw = document.getElementById('alwrap'); if (aw) aw.innerHTML = alCard(); }
+    else if (act === 'al-check') alCheck();
+    else if (act === 'al-show') alShow();
+    else if (act === 'al-only') { alOnlyErr = !alOnlyErr; alCur = null; alSeen = {}; render(); }
+    else if (act === 'al-reset') { if (confirm('Azzerare il contatore e gli errori da ripassare?')) { save('allenaStat', { n: 0, ok: 0, err: {} }); render(); } }
     else if (act === 'wtoggle') { var wb = el.closest('.wbox'); wOpen = !(wb && wb.classList.contains('open')); if (wb) wb.classList.toggle('open', wOpen); }
     else if (act === 'wchip') { wgroup = (wgroup === arg) ? '' : arg; var hb = document.getElementById('body'); if (hb) hb.innerHTML = homeBody(''); }
     else if (act === 'wlink') { wgroup = arg; go('home'); setTimeout(function () { var wb = document.getElementById('wbox'); if (wb) wb.scrollIntoView({ block: 'start' }); }, 60); }
